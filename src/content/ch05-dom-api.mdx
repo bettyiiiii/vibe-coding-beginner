@@ -1,0 +1,435 @@
+# Ch05 · 交互、DOM、API 调用
+
+> 让页面「活起来」——响应用户操作、动态修改页面、获取外部数据。
+
+---
+
+## 第一部分：DOM 操作（让页面动起来）
+
+### 什么是 DOM？
+
+**DOM = 网页的「结构树」**。
+
+```html
+<!-- 这个 HTML 会被浏览器转换成 DOM 树 -->
+<div id="app">
+  <h1>标题</h1>
+  <p class="desc">描述文字</p>
+</div>
+
+<!-- 对应的 DOM 树 -->
+DOM 树：
+div#app
+├── h1（文字：「标题」）
+└── p.desc（文字：「描述文字」）
+```
+
+**JavaScript 能操作 DOM → 页面会跟着变化。**
+
+---
+
+### 核心 DOM 操作
+
+#### 1. 选中元素（找东西）
+
+```javascript
+// 按 ID 找（最常用，推荐）
+const app = document.getElementById('app')
+
+// 按 CSS 选择器找（功能最强）
+const title = document.querySelector('h1')         // 找第一个 h1
+const items = document.querySelectorAll('.item')  // 找所有 .item
+
+// 按 class 找
+const desc = document.getElementsByClassName('desc')[0]
+```
+
+#### 2. 修改内容（改文字）
+
+```javascript
+const title = document.querySelector('h1')
+
+// 修改文字内容（推荐）
+title.textContent = '新标题'
+
+// 修改 HTML 内容（可以包含标签，有安全风险）
+title.innerHTML = '新标题 <span>副标题</span>'
+```
+
+#### 3. 修改样式（改外观）
+
+```javascript
+const title = document.querySelector('h1')
+
+// 直接修改样式
+title.style.color = 'red'
+title.style.fontSize = '24px'
+
+// 添加/移除 CSS 类（推荐方式）
+title.classList.add('active')      // 添加类
+title.classList.remove('active')   // 移除类
+title.classList.toggle('active')   // 有就移除，没有就添加
+```
+
+#### 4. 创建和插入元素（加新东西）
+
+```javascript
+// 创建新元素
+const newP = document.createElement('p')
+newP.textContent = '这是新段落'
+
+// 插入到页面
+const app = document.getElementById('app')
+app.appendChild(newP)          // 插入到末尾
+
+const title = document.querySelector('h1')
+app.insertBefore(newP, title)  // 插入到 title 前面
+```
+
+#### 5. 删除元素（扔东西）
+
+```javascript
+const desc = document.querySelector('.desc')
+desc.remove()   // 直接删除自己
+
+// 或者让父元素删除子元素
+const app = document.getElementById('app')
+const desc = document.querySelector('.desc')
+app.removeChild(desc)
+```
+
+---
+
+### 实战演练：用原生 JS 写一个待办清单
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .done { text-decoration: line-through; color: gray; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <input id="input" placeholder="输入待办..." />
+    <button id="addBtn">添加</button>
+    <ul id="list"></ul>
+  </div>
+
+  <script>
+    // 1. 选中元素
+    const input = document.getElementById('input')
+    const addBtn = document.getElementById('addBtn')
+    const list = document.getElementById('list')
+
+    // 2. 添加待办
+    addBtn.addEventListener('click', () => {
+      const text = input.value.trim()
+      if (!text) return
+
+      // 3. 创建新元素
+      const li = document.createElement('li')
+      li.textContent = text
+
+      // 4. 点击 li 切换完成状态
+      li.addEventListener('click', () => {
+        li.classList.toggle('done')
+      })
+
+      // 5. 插入到列表
+      list.appendChild(li)
+
+      // 6. 清空输入框
+      input.value = ''
+    })
+  </script>
+</body>
+</html>
+```
+
+**逐行解释**：
+
+| 行 | 作用 |
+|---|------|
+| `getElementById` | 选中页面上的元素 |
+| `addEventListener('click', ...)` | 监听点击事件 |
+| `input.value` | 获取输入框的内容 |
+| `document.createElement('li')` | 创建一个新 `<li>` 元素 |
+| `classList.toggle('done')` | 切换 CSS 类 → 切换完成样式 |
+| `list.appendChild(li)` | 把新 `<li>` 插入到 `<ul>` 末尾 |
+
+---
+
+## 第二部分：事件处理（响应用户操作）
+
+### 常见事件列表
+
+| 事件 | 触发时机 | 示例 |
+|------|----------|------|
+| `click` | 点击元素 | 按钮、列表项 |
+| `input` | 输入框内容变化 | 实时搜索 |
+| `submit` | 表单提交 | 登录表单 |
+| `keydown` / `keyup` | 按键按下/抬起 | 按 Enter 发送 |
+| `mouseover` | 鼠标移入 | 显示提示 |
+| `load` | 页面加载完成 | 初始化数据 |
+
+---
+
+### 事件处理函数
+
+```javascript
+// 方式 1：HTML 属性（不推荐）
+<button onclick="handleClick()">点击</button>
+
+// 方式 2：JS 绑定（推荐）
+const btn = document.querySelector('button')
+btn.addEventListener('click', () => {
+  console.log('按钮被点击了！')
+})
+
+// 方式 3：带参数的处理函数
+const sayHello = (name) => {
+  console.log(`你好，${name}！`)
+}
+
+btn.addEventListener('click', () => sayHello('小明'))
+```
+
+---
+
+### 事件对象（e）
+
+**事件对象包含了这次事件的所有信息。**
+
+```javascript
+const input = document.querySelector('input')
+
+input.addEventListener('keydown', (e) => {
+  console.log(e.key)        // 按下了哪个键？
+  console.log(e.code)        // 键的编码（如 'KeyA'）
+  console.log(e.ctrlKey)     // 是否同时按了 Ctrl？
+
+  if (e.key === 'Enter') {
+    console.log('用户按了回车！')
+  }
+})
+```
+
+---
+
+### 事件冒泡与阻止默认行为
+
+#### 阻止默认行为（如表单提交刷新页面）
+
+```javascript
+const form = document.querySelector('form')
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault()   // ← 阻止表单默认提交（页面刷新）
+  console.log('表单被提交了，但我阻止了页面刷新')
+})
+```
+
+#### 事件冒泡（点击子元素会触发父元素的事件）
+
+```html
+<div id="parent">
+  <button id="child">按钮</button>
+</div>
+```
+
+```javascript
+document.getElementById('parent').addEventListener('click', () => {
+  console.log('父元素被点击了')
+})
+
+document.getElementById('child').addEventListener('click', (e) => {
+  console.log('子元素被点击了')
+  e.stopPropagation()   // ← 阻止事件冒泡（父元素不会收到事件）
+})
+```
+
+---
+
+## 第三部分：API 调用（获取外部数据）
+
+### 什么是 API？
+
+**API = 让程序之间互相「对话」的桥梁。**
+
+```
+你的网页 ──发送请求──▶ 天气 API
+              ◀──返回数据──
+```
+
+---
+
+### Fetch API（最常用）
+
+#### 基本用法
+
+```javascript
+// 发送 GET 请求
+fetch('https://api.example.com/data')
+  .then(res => res.json())   // 把响应转成 JSON
+  .then(data => {
+    console.log('获取到的数据：', data)
+  })
+  .catch(err => {
+    console.error('出错了：', err)
+  })
+```
+
+#### 使用 async/await（更清晰，推荐）
+
+```javascript
+const fetchData = async () => {
+  try {
+    const res = await fetch('https://api.example.com/data')
+    const data = await res.json()
+    console.log('获取到的数据：', data)
+  } catch (err) {
+    console.error('出错了：', err)
+  }
+}
+
+fetchData()
+```
+
+---
+
+### 实战演练：调用天气 API
+
+#### 第一步：申请 API Key
+
+1. 访问 [OpenWeatherMap](https://openweathermap.org/api)
+2. 注册账号 → API Keys → 复制你的 Key
+
+#### 第二步：写代码
+
+```javascript
+const fetchWeather = async (city) => {
+  const apiKey = '你的_API_Key'
+  const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=zh_cn`
+
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('城市未找到')
+    const data = await res.json()
+
+    // 把数据展示到页面
+    document.getElementById('city').textContent = data.name
+    document.getElementById('temp').textContent = `${data.main.temp}°C`
+    document.getElementById('desc').textContent = data.weather[0].description
+  } catch (err) {
+    console.error('获取天气失败：', err.message)
+    alert('获取天气失败，请检查城市名是否正确')
+  }
+}
+
+// 点击按钮时调用
+document.getElementById('searchBtn').addEventListener('click', () => {
+  const city = document.getElementById('cityInput').value
+  fetchWeather(city)
+})
+```
+
+**对应的 HTML**：
+
+```html
+<input id="cityInput" placeholder="输入城市名（如 Beijing）" />
+<button id="searchBtn">查询</button>
+
+<div>
+  <h2 id="city"></h2>
+  <p id="temp"></p>
+  <p id="desc"></p>
+</div>
+```
+
+---
+
+### API 调用常见错误
+
+| 错误 | 原因 | 解决方法 |
+|------|------|----------|
+| `Failed to fetch` | 网络问题 / API 地址错误 | 检查 URL 是否正确 |
+| `401 Unauthorized` | API Key 错误 / 未提供 | 检查 API Key 是否正确 |
+| `404 Not Found` | 请求的资源不存在 | 检查 API 路径是否正确 |
+| `CORS error` | 跨域问题 | 使用代理 / 后端转发 |
+
+> ⚠️ **CORS 问题**：浏览器安全机制，前端直接调用第三方 API 可能被拦截。解决方式：让后端帮忙调用，或使用支持 CORS 的 API。
+
+---
+
+## 综合实战：一个完整的天气查询应用
+
+### 功能需求
+
+1. 输入城市名，点击查询
+2. 展示：城市名、温度、天气描述、湿度
+3. 根据天气显示不同图标
+4. 错误处理（城市不存在时提示）
+
+### 完整代码（AI 会帮你生成，你要能看懂）
+
+```html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>天气查询</title>
+  <style>
+    .weather-card { border: 1px solid #ddd; padding: 20px; max-width: 400px; margin: 20px auto; }
+    .error { color: red; }
+  </style>
+</head>
+<body>
+  <div class="weather-card">
+    <input id="cityInput" placeholder="输入城市名" />
+    <button id="searchBtn">查询</button>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const apiKey = '你的_API_Key'
+
+    document.getElementById('searchBtn').addEventListener('click', async () => {
+      const city = document.getElementById('cityInput').value.trim()
+      if (!city) return alert('请输入城市名')
+
+      try {
+        const res = await fetch(
+          `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=zh_cn`
+        )
+        if (!res.ok) throw new Error('城市未找到')
+
+        const data = await res.json()
+
+        document.getElementById('result').innerHTML = `
+          <h2>${data.name}</h2>
+          <p>🌡️ 温度：${data.main.temp}°C</p>
+          <p>💧 湿度：${data.main.humidity}%</p>
+          <p>🌤️ 天气：${data.weather[0].description}</p>
+        `
+      } catch (err) {
+        document.getElementById('result').innerHTML = `
+          <p class="error">错误：${err.message}</p>
+        `
+      }
+    })
+  </script>
+</body>
+</html>
+```
+
+---
+
+## 下一步
+
+- 如果你能看懂本章 70% 的内容 → 进入 [Ch06：完整项目实战]
+- 如果还有困惑 → 把不懂的代码发给 AI，让它逐行解释
+- 想直接看完整项目 → 进入 Ch06，跟着做一遍
+
+> 🎯 **学习目标**：学完本章，你要能做到——**看到网页交互效果，能在脑子里反推出大概的 JS 代码**。

@@ -1,0 +1,610 @@
+---
+title: "项目实战：社交平台"
+chapter: "23"
+description: "从零到一构建社交平台，涵盖用户关系、动态流、评论点赞、实时通知等核心功能"
+---
+
+# 项目实战：社交平台
+
+> 社交平台是 Web 开发的"百科全书"，涵盖几乎所有常见功能。
+
+## 项目概述
+
+### 功能清单
+
+```
+核心功能：
+✅ 用户注册/登录
+✅ 个人主页
+✅ 发布动态（文字、图片）
+✅ 关注/取关
+✅ 动态流（Feed）
+✅ 点赞/评论
+✅ 实时通知
+✅ 私信
+✅ 搜索用户/动态
+```
+
+### 技术栈
+
+```
+前端：
+- React 18 + TypeScript
+- Tailwind CSS
+- React Query（数据获取）
+- Zustand（状态管理）
+- Socket.io-client（实时通信）
+
+后端：
+- Node.js + Express
+- MongoDB（主数据库）
+- Redis（缓存 + 实时数据）
+- Socket.io（WebSocket）
+- AWS S3（图片存储）
+```
+
+## 数据库设计（MongoDB）
+
+### 用户集合
+
+```javascript
+// users collection
+{
+  _id: ObjectId("..."),
+  username: "zhangsan",
+  email: "zhangsan@example.com",
+  passwordHash: "...",  // bcrypt 加密
+  avatar: "https://s3.amazonaws.com/...",
+  bio: "热爱编程",
+  followers: [ObjectId("..."), ...],  // 粉丝
+  following: [ObjectId("..."), ...],  // 关注
+  createdAt: ISODate("2026-01-01T00:00:00Z")
+}
+```
+
+### 动态集合
+
+```javascript
+// posts collection
+{
+  _id: ObjectId("..."),
+  author: ObjectId("..."),  // 作者
+  content: "今天天气真好！",
+  images: [
+    "https://s3.amazonaws.com/...",
+    ...
+  ],
+  likes: [ObjectId("..."), ...],  // 点赞用户
+  commentsCount: 5,
+  createdAt: ISODate("2026-06-22T10:00:00Z"),
+  updatedAt: ISODate("2026-06-22T10:00:00Z")
+}
+```
+
+### 评论集合
+
+```javascript
+// comments collection
+{
+  _id: ObjectId("..."),
+  post: ObjectId("..."),  // 所属动态
+  author: ObjectId("..."),  // 评论作者
+  content: "赞同！",
+  likes: [ObjectId("..."), ...],
+  createdAt: ISODate("2026-06-22T10:05:00Z")
+}
+```
+
+### 通知集合
+
+```javascript
+// notifications collection
+{
+  _id: ObjectId("..."),
+  recipient: ObjectId("..."),  // 接收者
+  type: "like",  // like, comment, follow, mention
+  sender: ObjectId("..."),  // 触发者
+  post: ObjectId("..."),  // 相关动态（可选）
+  read: false,
+  createdAt: ISODate("2026-06-22T10:10:00Z")
+}
+```
+
+## 后端实现
+
+### 动态流算法
+
+```
+问题：如何生成"动态流"（Feed）？
+
+方案 1：拉模式（Pull）
+- 用户访问首页时，查询所有关注用户的动态
+- 优点：实时性好
+- 缺点：查询慢（N 次查询）
+
+方案 2：推模式（Push）
+- 用户发布动态时，推送到所有粉丝的 Feed 表
+- 优点：读取快（1 次查询）
+- 缺点：存储空间大
+
+方案 3：混合模式（推荐）
+- 活跃用户：推模式
+- 不活跃用户：拉模式
+```
+
+### 推模式实现
+
+```javascript
+// 发布动态
+app.post('/posts', authenticate, async (req, res) => {
+  const { content, images } = req.body
+  const authorId = req.user.id
+  
+  // 1. 创建动态
+  const post = await Post.create({
+    author: authorId,
+    content,
+    images
+  })
+  
+  // 2. 获取粉丝列表
+  const user = await User.findById(authorId)
+  const followerIds = user.followers
+  
+  // 3. 推送到粉丝的 Feed
+  const feedItems = followerIds.map(userId => ({
+    user: userId,
+    post: post._id,
+    createdAt: new Date()
+  }))
+  
+  await Feed.insertMany(feedItems)
+  
+  res.status(201).json(post)
+})
+```
+
+```javascript
+// 获取动态流
+app.get('/feed', authenticate, async (req, res) => {
+  const userId = req.user.id
+  const { page = 1, limit = 20 } = req.query
+  
+  // 从 Feed 表读取
+  const feeds = await Feed.find({ user: userId })
+    .sort({ createdAt: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .populate('post')
+  
+  res.json(feeds.map(f => f.post))
+})
+```
+
+### 实时通知（Socket.io）
+
+```javascript
+// server.js
+const io = new Server(server)
+
+io.on('connection', (socket) => {
+  // 用户上线时，加入个人房间
+  socket.on('join', (userId) => {
+    socket.join(userId)
+  })
+  
+  // 点赞
+  socket.on('like', async (postId) => {
+    const post = await Post.findById(postId)
+    post.likes.push(req.user.id)
+    await post.save()
+    
+    // 发送通知给动态作者
+    io.to(post.author.toString()).emit('notification', {
+      type: 'like',
+      sender: req.user.id,
+      post: postId
+    })
+  })
+  
+  // 评论
+  socket.on('comment', async ({ postId, content }) => {
+    const comment = await Comment.create({
+      post: postId,
+      author: req.user.id,
+      content
+    })
+    
+    const post = await Post.findById(postId)
+    
+    // 发送通知给动态作者
+    io.to(post.author.toString()).emit('notification', {
+      type: 'comment',
+      sender: req.user.id,
+      post: postId,
+      comment: comment._id
+    })
+  })
+})
+```
+
+## 前端实现
+
+### 动态流组件
+
+```jsx
+// src/pages/Feed.jsx
+import { useInfiniteQuery } from 'react-query'
+import PostCard from '../components/PostCard'
+
+function Feed() {
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery(
+      'feed',
+      async ({ pageParam = 1 }) => {
+        const res = await fetch(`/api/feed?page=${pageParam}`)
+        return res.json()
+      },
+      {
+        getNextPageParam: (lastPage, pages) => {
+          return lastPage.hasMore ? pages.length + 1 : undefined
+        }
+      }
+    )
+  
+  // 无限滚动
+  const observer = useRef()
+  const lastPostRef = useCallback(node => {
+    if (observer.current) observer.current.disconnect()
+    
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasNextPage) {
+        fetchNextPage()
+      }
+    })
+    
+    if (node) observer.current.observe(node)
+  }, [hasNextPage, fetchNextPage])
+  
+  return (
+    <div>
+      {data.pages.map((page, i) => (
+        page.posts.map((post, j) => (
+          <PostCard
+            key={post._id}
+            post={post}
+            ref={i === page.posts.length - 1 && j === page.posts.length - 1 ? lastPostRef : null}
+          />
+        ))
+      ))}
+      
+      {isFetchingNextPage && <div>加载中...</div>}
+    </div>
+  )
+}
+```
+
+### 实时通知组件
+
+```jsx
+// src/components/NotificationBell.jsx
+import { useEffect, useState } from 'react'
+import { io } from 'socket.io-client'
+
+function NotificationBell() {
+  const [notifications, setNotifications] = useState([])
+  const [isOpen, setIsOpen] = useState(false)
+  
+  useEffect(() => {
+    const socket = io('http://localhost:3001')
+    
+    // 加入个人房间
+    socket.emit('join', user.id)
+    
+    // 接收通知
+    socket.on('notification', (notification) => {
+      setNotifications(prev => [notification, ...prev])
+    })
+    
+    return () => socket.disconnect()
+  }, [])
+  
+  const unreadCount = notifications.filter(n => !n.read).length
+  
+  return (
+    <div className="relative">
+      <button onClick={() => setIsOpen(!isOpen)}>
+        🔔
+        {unreadCount > 0 && (
+          <span className="badge">{unreadCount}</span>
+        )}
+      </button>
+      
+      {isOpen && (
+        <div className="dropdown">
+          {notifications.length === 0 ? (
+            <p>暂无通知</p>
+          ) : (
+            notifications.map(notif => (
+              <div key={notif._id} className={notif.read ? '' : 'unread'}>
+                <p>
+                  <strong>{notif.sender.name}</strong>
+                  {notif.type === 'like' && ' 点赞了你的动态'}
+                  {notif.type === 'comment' && ' 评论了你的动态'}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+## 图片上传（AWS S3）
+
+### 后端：生成预签名 URL
+
+```javascript
+// routes/uploads.js
+const AWS = require('aws-sdk')
+const s3 = new AWS.S3()
+
+app.post('/upload', authenticate, async (req, res) => {
+  const { filename, filetype } = req.body
+  
+  // 生成预签名 URL（客户端直接上传到 S3）
+  const presignedUrl = await s3.getSignedUrlPromise('putObject', {
+    Bucket: 'my-social-app',
+    Key: `uploads/${req.user.id}/${Date.now()}-${filename}`,
+    ContentType: filetype,
+    Expires: 60 * 5  // 5 分钟有效
+  })
+  
+  res.json({ uploadUrl: presignedUrl })
+})
+```
+
+### 前端：直接上传到 S3
+
+```jsx
+// src/components/CreatePost.jsx
+function CreatePost() {
+  const [content, setContent] = useState('')
+  const [images, setImages] = useState([])
+  
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files)
+    
+    for (const file of files) {
+      // 1. 获取预签名 URL
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: JSON.stringify({
+          filename: file.name,
+          filetype: file.type
+        })
+      })
+      const { uploadUrl } = await res.json()
+      
+      // 2. 直接上传到 S3
+      await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type }
+      })
+      
+      // 3. 保存图片 URL
+      const imageUrl = uploadUrl.split('?')[0]
+      setImages(prev => [...prev, imageUrl])
+    }
+  }
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    await fetch('/api/posts', {
+      method: 'POST',
+      body: JSON.stringify({ content, images })
+    })
+    
+    setContent('')
+    setImages([])
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="分享你的动态..."
+      />
+      
+      <input type="file" multiple onChange={handleImageUpload} />
+      
+      <div className="preview">
+        {images.map((url, i) => (
+          <img key={i} src={url} alt="Preview" />
+        ))}
+      </div>
+      
+      <button type="submit">发布</button>
+    </form>
+  )
+}
+```
+
+## 搜索功能（Elasticsearch）
+
+### 后端：索引动态
+
+```javascript
+// utils/search.js
+const { Client } = require('@elastic/elasticsearch')
+const client = new Client({ node: 'http://localhost:9200' })
+
+// 索引动态
+async function indexPost(post) {
+  await client.index({
+    index: 'posts',
+    id: post._id.toString(),
+    body: {
+      content: post.content,
+      author: post.author.name,
+      createdAt: post.createdAt
+    }
+  })
+}
+
+// 搜索动态
+async function searchPosts(query) {
+  const result = await client.search({
+    index: 'posts',
+    body: {
+      query: {
+        multi_match: {
+          query,
+          fields: ['content', 'author']
+        }
+      }
+    }
+  })
+  
+  return result.hits.hits
+}
+```
+
+### 前端：搜索组件
+
+```jsx
+// src/components/SearchBar.jsx
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+
+function SearchBar() {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [isOpen, setIsOpen] = useState(false)
+  const navigate = useNavigate()
+  
+  const handleSearch = async (e) => {
+    const value = e.target.value
+    setQuery(value)
+    
+    if (value.length < 2) {
+      setResults([])
+      return
+    }
+    
+    // 防抖（debounce）
+    const timer = setTimeout(async () => {
+      const res = await fetch(`/api/search?q=${value}`)
+      const data = await res.json()
+      setResults(data)
+      setIsOpen(true)
+    }, 300)
+    
+    return () => clearTimeout(timer)
+  }
+  
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={handleSearch}
+        placeholder="搜索用户或动态..."
+        className="search-input"
+      />
+      
+      {isOpen && results.length > 0 && (
+        <div className="dropdown">
+          {results.map(result => (
+            <div
+              key={result._id}
+              onClick={() => {
+                navigate(`/post/${result._id}`)
+                setIsOpen(false)
+              }}
+            >
+              {result.content}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+## 性能优化
+
+### 1. 数据库索引
+
+```javascript
+// 为常用查询字段创建索引
+db.users.createIndex({ username: 1 })
+db.posts.createIndex({ author: 1, createdAt: -1 })
+db.feeds.createIndex({ user: 1, createdAt: -1 })
+```
+
+### 2. Redis 缓存
+
+```javascript
+// 缓存用户资料
+app.get('/users/:id', async (req, res) => {
+  const userId = req.params.id
+  
+  // 1. 先查 Redis
+  const cached = await redis.get(`user:${userId}`)
+  if (cached) {
+    return res.json(JSON.parse(cached))
+  }
+  
+  // 2. Redis 未命中，查 MongoDB
+  const user = await User.findById(userId)
+  
+  // 3. 写入 Redis（1 小时过期）
+  await redis.setex(`user:${userId}`, 3600, JSON.stringify(user))
+  
+  res.json(user)
+})
+```
+
+### 3. 分页
+
+```javascript
+// 使用游标分页（Cursor-based Pagination）
+app.get('/posts', async (req, res) => {
+  const { cursor, limit = 20 } = req.query
+  
+  let query = {}
+  if (cursor) {
+    query = { _id: { $lt: cursor } }
+  }
+  
+  const posts = await Post.find(query)
+    .sort({ _id: -1 })
+    .limit(parseInt(limit))
+  
+  res.json({
+    posts,
+    nextCursor: posts.length > 0 ? posts[posts.length - 1]._id : null
+  })
+})
+```
+
+## 小结
+
+✅ **已完成：**
+- 掌握了社交平台的完整架构
+- 学会了动态流算法（推拉模式）
+- 实现了实时通知（Socket.io）
+- 掌握了图片上传（AWS S3）
+- 学会了搜索功能（Elasticsearch）
+- 了解了性能优化技巧
+
+🎉 **恭喜！** 你已经完成了一个复杂的全栈社交平台项目！
+
+💡 **下一步：** 可以添加更多高级功能，如推荐算法、视频上传、直播等！

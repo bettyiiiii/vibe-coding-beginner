@@ -1,0 +1,688 @@
+---
+title: "全栈项目实战"
+chapter: "09"
+description: "前后端联调、DevOps 流程、CI/CD 部署、项目实战案例"
+---
+
+# 全栈项目实战
+
+> 全栈开发 = 前端 + 后端 + 数据库，一个人搞定整个产品。
+
+## 全栈技术栈选型
+
+### MERN 栈 (MongoDB + Express + React + Node.js)
+
+```javascript
+// 技术栈组件
+前端: React (Vite) + Tailwind CSS
+后端: Node.js + Express
+数据库: MongoDB (Mongoose)
+认证: JWT + bcrypt
+部署: Vercel (前端) + Render (后端)
+```
+
+### MEVN 栈 (MongoDB + Express + Vue + Node.js)
+
+```javascript
+// Vue 3 组合式 API
+import { ref, computed } from 'vue'
+
+export default {
+  setup() {
+    const count = ref(0)
+    const doubled = computed(() => count.value * 2)
+    
+    function increment() {
+      count.value++
+    }
+    
+    return { count, doubled, increment }
+  }
+}
+```
+
+### Python 全栈 (Django + React)
+
+```python
+# Django 后端 API
+# views.py
+from rest_framework import viewsets
+from .serializers import PostSerializer
+from .models import Post
+
+class PostViewSet(viewsets.ModelViewSet):
+    queryset = Post.objects.all().order_by('-created_at')
+    serializer_class = PostSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+```
+
+## 前后端联调
+
+### API 请求封装
+
+```javascript
+// utils/api.js
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+
+class ApiClient {
+  constructor() {
+    this.baseUrl = API_BASE_URL
+  }
+  
+  async request(endpoint, options = {}) {
+    const url = `${this.baseUrl}${endpoint}`
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+    
+    // 添加认证令牌
+    const token = localStorage.getItem('token')
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    
+    const response = await fetch(url, {
+      ...options,
+      headers
+    })
+    
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.message || '请求失败')
+    }
+    
+    return response.json()
+  }
+  
+  get(endpoint) {
+    return this.request(endpoint)
+  }
+  
+  post(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    })
+  }
+  
+  put(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    })
+  }
+  
+  delete(endpoint) {
+    return this.request(endpoint, {
+      method: 'DELETE'
+    })
+  }
+}
+
+export default new ApiClient()
+```
+
+### 前端调用示例
+
+```jsx
+// components/PostList.jsx
+import { useState, useEffect } from 'react'
+import api from '../utils/api'
+
+export default function PostList() {
+  const [posts, setPosts] = useState([])
+  const [loading, setLoading] = useState(true)
+  
+  useEffect(() => {
+    async function fetchPosts() {
+      try {
+        const data = await api.get('/api/posts')
+        setPosts(data.posts)
+      } catch (error) {
+        console.error('获取文章失败:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchPosts()
+  }, [])
+  
+  if (loading) return <div>加载中...</div>
+  
+  return (
+    <div className="post-list">
+      {posts.map(post => (
+        <div key={post.id} className="post-card">
+          <h3>{post.title}</h3>
+          <p>{post.content}</p>
+          <span>作者: {post.author.username}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+## DevOps 流程
+
+### CI/CD 流水线
+
+```yaml
+# .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v3
+      - name: 部署到 Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.ORG_ID }}
+          vercel-project-id: ${{ secrets.PROJECT_ID }}
+          vercel-args: '--prod'
+```
+
+### Docker 容器化
+
+```dockerfile
+# Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["node", "server.js"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+      
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      MONGODB_URI: mongodb://admin:password@mongo:27017/myapp?authSource=admin
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+
+volumes:
+  mongo-data:
+```
+
+## 项目实战案例：任务管理应用
+
+### 需求分析
+
+| 功能模块 | 描述 |
+|----------|------|
+| 用户认证 | 注册、登录、JWT 认证 |
+| 任务管理 | 创建、编辑、删除、查看任务 |
+| 任务分类 | 按状态、优先级、标签分类 |
+| 团队协作 | 任务分配、评论、通知 |
+
+### 数据库设计
+
+```javascript
+// models/Task.js
+const taskSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  description: { type: String },
+  status: {
+    type: String,
+    enum: ['todo', 'in-progress', 'done'],
+    default: 'todo'
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
+  },
+  assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  tags: [{ type: String }],
+  dueDate: { type: Date },
+  comments: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    content: String,
+    createdAt: { type: Date, default: Date.now }
+  }],
+  createdAt: { type: Date, default: Date.now }
+})
+
+// models/User.js
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  avatar: { type: String },
+  createdAt: { type: Date, default: Date.now }
+})
+```
+
+### 后端 API 实现
+
+```javascript
+// routes/tasks.js
+const express = require('express')
+const router = express.Router()
+const Task = require('../models/Task')
+const authMiddleware = require('../middleware/auth')
+
+// 获取所有任务
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { status, priority, tag } = req.query
+    const query = { createdBy: req.userId }
+    
+    if (status) query.status = status
+    if (priority) query.priority = priority
+    if (tag) query.tags = tag
+    
+    const tasks = await Task.find(query)
+      .populate('assignedTo', 'username avatar')
+      .sort({ createdAt: -1 })
+      
+    res.json({ success: true, data: tasks })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 创建任务
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    const { title, description, status, priority, tags, dueDate } = req.body
+    
+    const task = new Task({
+      title,
+      description,
+      status: status || 'todo',
+      priority: priority || 'medium',
+      tags: tags || [],
+      dueDate,
+      createdBy: req.userId
+    })
+    
+    await task.save()
+    await task.populate('createdBy', 'username avatar')
+    
+    res.status(201).json({ success: true, data: task })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 更新任务
+router.put('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params
+    const updates = req.body
+    
+    const task = await Task.findOneAndUpdate(
+      { _id: id, createdBy: req.userId },
+      updates,
+      { new: true }
+    ).populate('assignedTo', 'username avatar')
+    
+    if (!task) {
+      return res.status(404).json({ success: false, message: '任务不存在' })
+    }
+    
+    res.json({ success: true, data: task })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+// 删除任务
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const { id } = req.params
+    
+    const task = await Task.findOneAndDelete({
+      _id: id,
+      createdBy: req.userId
+    })
+    
+    if (!task) {
+      return res.status(404).json({ success: false, message: '任务不存在' })
+    }
+    
+    res.json({ success: true, message: '任务已删除' })
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message })
+  }
+})
+
+module.exports = router
+```
+
+### 前端任务管理页面
+
+```jsx
+// pages/Tasks.jsx
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import api from '../utils/api'
+
+export default function Tasks() {
+  const [tasks, setTasks] = useState([])
+  const [filter, setFilter] = useState({ status: '', priority: '' })
+  const [showForm, setShowForm] = useState(false)
+  const [editingTask, setEditingTask] = useState(null)
+  
+  // 获取任务列表
+  useEffect(() => {
+    fetchTasks()
+  }, [filter])
+  
+  async function fetchTasks() {
+    try {
+      const query = new URLSearchParams()
+      if (filter.status) query.append('status', filter.status)
+      if (filter.priority) query.append('priority', filter.priority)
+      
+      const data = await api.get(`/api/tasks?${query.toString()}`)
+      setTasks(data.data)
+    } catch (error) {
+      console.error('获取任务失败:', error)
+    }
+  }
+  
+  async function handleDelete(taskId) {
+    if (!confirm('确定要删除这个任务吗？')) return
+    
+    try {
+      await api.delete(`/api/tasks/${taskId}`)
+      setTasks(tasks.filter(task => task._id !== taskId))
+    } catch (error) {
+      console.error('删除任务失败:', error)
+    }
+  }
+  
+  return (
+    <div className="tasks-page">
+      <div className="page-header">
+        <h1>任务管理</h1>
+        <button 
+          onClick={() => { setShowForm(true); setEditingTask(null) }}
+          className="btn btn-primary"
+        >
+          创建任务
+        </button>
+      </div>
+      
+      {/* 过滤器 */}
+      <div className="filters">
+        <select 
+          value={filter.status} 
+          onChange={(e) => setFilter({...filter, status: e.target.value})}
+        >
+          <option value="">所有状态</option>
+          <option value="todo">待办</option>
+          <option value="in-progress">进行中</option>
+          <option value="done">已完成</option>
+        </select>
+        
+        <select 
+          value={filter.priority} 
+          onChange={(e) => setFilter({...filter, priority: e.target.value})}
+        >
+          <option value="">所有优先级</option>
+          <option value="low">低</option>
+          <option value="medium">中</option>
+          <option value="high">高</option>
+        </select>
+      </div>
+      
+      {/* 任务列表 */}
+      <div className="task-list">
+        {tasks.map(task => (
+          <div key={task._id} className={`task-card status-${task.status}`}>
+            <div className="task-header">
+              <h3>{task.title}</h3>
+              <span className={`priority-badge priority-${task.priority}`}>
+                {task.priority}
+              </span>
+            </div>
+            <p className="task-description">{task.description}</p>
+            <div className="task-footer">
+              <span className="task-status">{task.status}</span>
+              <div className="task-actions">
+                <button 
+                  onClick={() => { setEditingTask(task); setShowForm(true) }}
+                  className="btn btn-sm"
+                >
+                  编辑
+                </button>
+                <button 
+                  onClick={() => handleDelete(task._id)}
+                  className="btn btn-sm btn-danger"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* 任务表单 (创建/编辑) */}
+      {showForm && (
+        <TaskForm 
+          task={editingTask}
+          onSave={() => {
+            setShowForm(false)
+            fetchTasks()
+          }}
+          onCancel={() => setShowForm(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// 任务表单组件
+function TaskForm({ task, onSave, onCancel }) {
+  const [formData, setFormData] = useState({
+    title: task?.title || '',
+    description: task?.description || '',
+    status: task?.status || 'todo',
+    priority: task?.priority || 'medium',
+    tags: task?.tags?.join(', ') || ''
+  })
+  
+  function handleChange(e) {
+    const { name, value } = e.target
+    setFormData({...formData, [name]: value})
+  }
+  
+  async function handleSubmit(e) {
+    e.preventDefault()
+    
+    try {
+      const payload = {
+        ...formData,
+        tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean)
+      }
+      
+      if (task) {
+        await api.put(`/api/tasks/${task._id}`, payload)
+      } else {
+        await api.post('/api/tasks', payload)
+      }
+      
+      onSave()
+    } catch (error) {
+      console.error('保存任务失败:', error)
+    }
+  }
+  
+  return (
+    <div className="task-form-overlay">
+      <form className="task-form" onSubmit={handleSubmit}>
+        <h2>{task ? '编辑任务' : '创建任务'}</h2>
+        
+        <div className="form-group">
+          <label>标题</label>
+          <input 
+            type="text" 
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            required
+          />
+        </div>
+        
+        <div className="form-group">
+          <label>描述</label>
+          <textarea 
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            rows="3"
+          />
+        </div>
+        
+        <div className="form-row">
+          <div className="form-group">
+            <label>状态</label>
+            <select name="status" value={formData.status} onChange={handleChange}>
+              <option value="todo">待办</option>
+              <option value="in-progress">进行中</option>
+              <option value="done">已完成</option>
+            </select>
+          </div>
+          
+          <div className="form-group">
+            <label>优先级</label>
+            <select name="priority" value={formData.priority} onChange={handleChange}>
+              <option value="low">低</option>
+              <option value="medium">中</option>
+              <option value="high">高</option>
+            </select>
+          </div>
+        </div>
+        
+        <div className="form-group">
+          <label>标签 (逗号分隔)</label>
+          <input 
+            type="text" 
+            name="tags"
+            value={formData.tags}
+            onChange={handleChange}
+            placeholder="重要, 紧急"
+          />
+        </div>
+        
+        <div className="form-actions">
+          <button type="submit" className="btn btn-primary">
+            {task ? '更新' : '创建'}
+          </button>
+          <button type="button" onClick={onCancel} className="btn">
+            取消
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+```
+
+## 部署到生产环境
+
+### 前端部署 (Vercel)
+
+```bash
+# 1. 安装 Vercel CLI
+npm install -g vercel
+
+# 2. 登录
+vercel login
+
+# 3. 部署
+vercel --prod
+
+# 4. 设置环境变量
+vercel env add VITE_API_BASE_URL
+```
+
+### 后端部署 (Render)
+
+```yaml
+# render.yaml
+services:
+  - type: web
+    name: vibe-coding-api
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        fromDatabase:
+          name: vibe-coding-db
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+```
+
+## 下一步
+
+- 学习 [第10章：性能优化与安全防护]()
+- 实战 [添加实时通知功能 (WebSocket)]()
+- 进阶 [微服务架构设计]()

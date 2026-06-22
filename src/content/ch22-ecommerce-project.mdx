@@ -1,0 +1,577 @@
+---
+title: "项目实战：电商网站"
+chapter: "22"
+description: "从零到一构建电商网站，涵盖商品展示、购物车、订单、支付、用户中心等核心功能"
+---
+
+# 项目实战：电商网站
+
+> 实战是最好的学习方式。
+
+## 项目概述
+
+### 功能清单
+
+```
+用户端：
+✅ 用户注册/登录
+✅ 商品列表/搜索/筛选
+✅ 商品详情
+✅ 购物车
+✅ 下单/支付
+✅ 订单查询
+✅ 用户中心
+
+管理端：
+✅ 商品管理（CRUD）
+✅ 订单管理
+✅ 用户管理
+✅ 数据统计
+```
+
+### 技术栈
+
+```
+前端：
+- React 18 + TypeScript
+- Tailwind CSS
+- React Router
+- Zustand（状态管理）
+- Axios（HTTP 客户端）
+
+后端：
+- Node.js + Express
+- MySQL（数据库）
+- JWT（认证）
+- Stripe（支付）
+```
+
+## 数据库设计
+
+### ER 图
+
+```
+┌─────────┐     ┌─────────┐     ┌─────────┐
+│  用户    │────│  订单    │────│  商品    │
+│  (User)  │1   N│ (Order) │N   M│(Product)│
+└─────────┘     └─────────┘     └─────────┘
+     1│               │1              │N
+       │               │              │
+       │     ┌─────────┐          │
+       └────│  购物车  │←─────────┘
+             │ (Cart)  │
+             └─────────┘
+```
+
+### 表结构
+
+```sql
+-- 用户表
+CREATE TABLE users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(50) UNIQUE NOT NULL,
+  email VARCHAR(100) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role ENUM('user', 'admin') DEFAULT 'user',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 商品表
+CREATE TABLE products (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(200) NOT NULL,
+  description TEXT,
+  price DECIMAL(10, 2) NOT NULL,
+  stock INT NOT NULL DEFAULT 0,
+  image_url VARCHAR(500),
+  category_id INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_category (category_id),
+  INDEX idx_price (price)
+);
+
+-- 订单表
+CREATE TABLE orders (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  total_amount DECIMAL(10, 2) NOT NULL,
+  status ENUM('pending', 'paid', 'shipped', 'completed', 'cancelled') DEFAULT 'pending',
+  shipping_address TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_user (user_id),
+  INDEX idx_status (status)
+);
+
+-- 订单详情表
+CREATE TABLE order_items (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  order_id INT NOT NULL,
+  product_id INT NOT NULL,
+  quantity INT NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (product_id) REFERENCES products(id)
+);
+
+-- 购物车表
+CREATE TABLE cart_items (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  product_id INT NOT NULL,
+  quantity INT NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  UNIQUE KEY uk_user_product (user_id, product_id)
+);
+```
+
+## 后端实现
+
+### 项目结构
+
+```
+ecommerce-server/
+├── src/
+│   ├── config/
+│   │   └── database.js
+│   ├── middlewares/
+│   │   ├── auth.js
+│   │   └── errorHandler.js
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── products.js
+│   │   ├── orders.js
+│   │   └── users.js
+│   ├── controllers/
+│   ├── models/
+│   └── index.js
+├── package.json
+└── .env
+```
+
+### 入口文件
+
+```javascript
+// src/index.js
+const express = require('express')
+const cors = require('cors')
+const helmet = require('helmet')
+const morgan = require('morgan')
+
+const app = express()
+
+// 中间件
+app.use(helmet())
+app.use(cors())
+app.use(express.json())
+app.use(morgan('combined'))
+
+// 路由
+app.use('/api/auth', require('./routes/auth'))
+app.use('/api/products', require('./routes/products'))
+app.use('/api/orders', require('./routes/orders'))
+app.use('/api/users', require('./routes/users'))
+
+// 错误处理
+app.use(require('./middlewares/errorHandler'))
+
+// 启动服务器
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
+```
+
+### 认证中间件
+
+```javascript
+// src/middlewares/auth.js
+const jwt = require('jsonwebtoken')
+
+module.exports = (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1]
+    
+    if (!token) {
+      return res.status(401).json({ message: '未提供 token' })
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
+    req.user = decoded
+    next()
+  } catch (error) {
+    return res.status(401).json({ message: 'token 无效或已过期' })
+  }
+}
+```
+
+### 商品路由
+
+```javascript
+// src/routes/products.js
+const express = require('express')
+const router = express.Router()
+const { auth } = require('../middlewares/auth')
+
+// 获取商品列表（公开）
+router.get('/', async (req, res) => {
+  const { page = 1, limit = 20, category, search } = req.query
+  
+  let query = 'SELECT * FROM products WHERE 1=1'
+  const params = []
+  
+  if (category) {
+    query += ' AND category_id = ?'
+    params.push(category)
+  }
+  
+  if (search) {
+    query += ' AND name LIKE ?'
+    params.push(`%${search}%`)
+  }
+  
+  query += ' LIMIT ? OFFSET ?'
+  params.push(parseInt(limit), (page - 1) * limit)
+  
+  const [products] = await db.query(query, params)
+  res.json(products)
+})
+
+// 获取商品详情（公开）
+router.get('/:id', async (req, res) => {
+  const [products] = await db.query(
+    'SELECT * FROM products WHERE id = ?',
+    [req.params.id]
+  )
+  
+  if (products.length === 0) {
+    return res.status(404).json({ message: '商品不存在' })
+  }
+  
+  res.json(products[0])
+})
+
+// 创建商品（需要管理员权限）
+router.post('/', auth, async (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ message: '权限不足' })
+  }
+  
+  const { name, description, price, stock, image_url, category_id } = req.body
+  
+  const [result] = await db.query(
+    'INSERT INTO products (name, description, price, stock, image_url, category_id) VALUES (?, ?, ?, ?, ?, ?)',
+    [name, description, price, stock, image_url, category_id]
+  )
+  
+  res.status(201).json({ id: result.insertId, ...req.body })
+})
+
+module.exports = router
+```
+
+## 前端实现
+
+### 项目结构
+
+```
+ecommerce-client/
+├── src/
+│   ├── components/
+│   │   ├── Header.jsx
+│   │   ├── ProductCard.jsx
+│   │   └── CartItem.jsx
+│   ├── pages/
+│   │   ├── Home.jsx
+│   │   ├── ProductDetail.jsx
+│   │   ├── Cart.jsx
+│   │   ├── Checkout.jsx
+│   │   └── Orders.jsx
+│   ├── store/
+│   │   ├── authStore.js
+│   │   └── cartStore.js
+│   ├── api/
+│   │   └── index.js
+│   ├── App.jsx
+│   └── main.jsx
+├── package.json
+└── vite.config.js
+```
+
+### 状态管理（Zustand）
+
+```javascript
+// src/store/cartStore.js
+import { create } from 'zustand'
+
+const useCartStore = create((set, get) => ({
+  items: [],
+  isLoading: false,
+  
+  // 获取购物车
+  fetchCart: async () => {
+    set({ isLoading: true })
+    const response = await fetch('/api/cart', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      }
+    })
+    const data = await response.json()
+    set({ items: data, isLoading: false })
+  },
+  
+  // 添加商品
+  addToCart: async (productId, quantity = 1) => {
+    await fetch('/api/cart', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({ product_id: productId, quantity })
+    })
+    
+    // 重新获取购物车
+    get().fetchCart()
+  },
+  
+  // 计算总价
+  getTotal: () => {
+    return get().items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  }
+}))
+
+export default useCartStore
+```
+
+### 商品列表页
+
+```javascript
+// src/pages/Home.jsx
+import { useEffect, useState } from 'react'
+import ProductCard from '../components/ProductCard'
+import { fetchProducts } from '../api'
+
+function Home() {
+  const [products, setProducts] = useState([])
+  const [filters, setFilters] = useState({
+    category: '',
+    search: '',
+    page: 1
+  })
+  
+  useEffect(() => {
+    loadProducts()
+  }, [filters])
+  
+  const loadProducts = async () => {
+    const data = await fetchProducts(filters)
+    setProducts(data)
+  }
+  
+  return (
+    <div>
+      <div className="filters">
+        <input
+          type="text"
+          placeholder="搜索商品..."
+          value={filters.search}
+          onChange={(e) => setFilters({...filters, search: e.target.value})}
+        />
+        <select
+          value={filters.category}
+          onChange={(e) => setFilters({...filters, category: e.target.value})}
+        >
+          <option value="">全部分类</option>
+          <option value="1">电子产品</option>
+          <option value="2">服装</option>
+        </select>
+      </div>
+      
+      <div className="product-grid">
+        {products.map(product => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default Home
+```
+
+## 支付集成（Stripe）
+
+### 后端实现
+
+```javascript
+// src/routes/payments.js
+const express = require('express')
+const router = express.Router()
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+
+router.post('/create-payment-intent', async (req, res) => {
+  const { amount, order_id } = req.body
+  
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amount * 100, // Stripe 使用最小单位（分）
+    currency: 'cny',
+    metadata: {
+      order_id: order_id.toString()
+    }
+  })
+  
+  res.json({
+    clientSecret: paymentIntent.client_secret
+  })
+})
+
+module.exports = router
+```
+
+### 前端实现
+
+```javascript
+// src/pages/Checkout.jsx
+import { loadStripe } from '@stripe/stripe-js'
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
+
+const stripePromise = loadStripe(process.env.VITE_STRIPE_PUBLIC_KEY)
+
+function CheckoutForm() {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [error, setError] = useState(null)
+  const [processing, setProcessing] = useState(false)
+  
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    setProcessing(true)
+    
+    const { error, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: elements.getElement(CardElement)
+    })
+    
+    if (error) {
+      setError(error.message)
+      setProcessing(false)
+      return
+    }
+    
+    // 调用后端创建支付
+    const response = await fetch('/api/payments/create-payment-intent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}`
+      },
+      body: JSON.stringify({
+        amount: 100.00,
+        order_id: 123
+      })
+    })
+    
+    const { clientSecret } = await response.json()
+    
+    // 确认支付
+    const { error: confirmError } = await stripe.confirmCardPayment(clientSecret, {
+      payment_method: paymentMethod.id
+    })
+    
+    if (confirmError) {
+      setError(confirmError.message)
+    } else {
+      // 支付成功
+      alert('支付成功！')
+    }
+    
+    setProcessing(false)
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <CardElement />
+      {error && <div className="error">{error}</div>}
+      <button disabled={processing}>
+        {processing ? '处理中...' : '支付'}
+      </button>
+    </form>
+  )
+}
+
+function Checkout() {
+  return (
+    <Elements stripe={stripePromise}>
+      <CheckoutForm />
+    </Elements>
+  )
+}
+
+export default Checkout
+```
+
+## 部署
+
+### Docker 化
+
+```dockerfile
+# Dockerfile
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY . .
+
+EXPOSE 3000
+
+CMD ["node", "src/index.js"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - JWT_SECRET=your-secret
+    depends_on:
+      - db
+  
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=ecommerce
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+
+volumes:
+  mysql_data:
+```
+
+## 小结
+
+✅ **已完成：**
+- 掌握了电商网站的完整架构
+- 学会了数据库设计
+- 实现了后端 API
+- 实现了前端页面
+- 集成了 Stripe 支付
+- 了解了 Docker 部署
+
+🎉 **恭喜！** 你已经完成了一个完整的全栈电商项目！
+
+💡 **提示：** 这只是基础版本，可以继续添加优惠券、秒杀、推荐系统等高级功能！

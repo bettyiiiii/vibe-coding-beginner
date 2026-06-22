@@ -1,0 +1,500 @@
+---
+title: "用户认证与授权"
+chapter: "15"
+description: "学习 JWT、OAuth 2.0、Session、RBAC 权限控制，掌握用户认证与授权的最佳实践"
+---
+
+# 用户认证与授权
+
+> 认证（Authentication）是验证用户身份，授权（Authorization）是控制用户权限。
+
+## 认证 vs 授权
+
+| 概念 | 说明 | 例子 |
+|------|------|------|
+| 认证（Authentication） | 你是谁？ | 登录（用户名+密码） |
+| 授权（Authorization） | 你能做什么？ | 管理员可以删除用户，普通用户不能 |
+
+## Session 认证（传统方式）
+
+### 工作流程
+
+```
+1. 用户输入用户名/密码
+2. 服务器验证通过，创建 Session
+3. 服务器返回 Session ID（通过 Cookie）
+4. 浏览器保存 Session ID
+5. 后续请求自动携带 Cookie
+6. 服务器通过 Session ID 识别用户
+```
+
+### Express + Session 实现
+
+```javascript
+// 安装依赖
+// npm install express express-session connect-mongo
+
+const express = require('express')
+const session = require('express-session')
+const MongoStore = require('connect-mongo')
+
+const app = express()
+
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  store: MongoStore.create({
+    mongoUrl: 'mongodb://localhost:27017/myapp'
+  }),
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24 // 1 天
+  }
+}))
+
+// 登录
+app.post('/login', (req, res) => {
+  const { username, password } = req.body
+  
+  // 验证用户名和密码（实际项目中应该查数据库）
+  if (username === 'admin' && password === '123456') {
+    req.session.user = {
+      id: 1,
+      username: 'admin',
+      role: 'admin'
+    }
+    res.json({ message: '登录成功' })
+  } else {
+    res.status(401).json({ message: '用户名或密码错误' })
+  }
+})
+
+// 登出
+app.post('/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.status(500).json({ message: '登出失败' })
+    }
+    res.clearCookie('connect.sid')
+    res.json({ message: '登出成功' })
+  })
+})
+
+// 需要登录的路由
+app.get('/profile', (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ message: '请先登录' })
+  }
+  
+  res.json({ user: req.session.user })
+})
+
+app.listen(3000)
+```
+
+### Session 的优缺点
+
+| 优点 | 缺点 |
+|------|------|
+| 简单易懂 | 占用服务器内存 |
+| 支持撤销 | 不适合分布式系统 |
+| 天然支持 CSRF 防护 | Cookie 依赖 |
+
+## JWT 认证（现代方式）
+
+### JWT 结构
+
+```
+Header.Payload.Signature
+
+例子：
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
+eyJpZCI6MSwidXNlcm5hbWUiOiJhZG1pbiIsInJvbGUiOiJhZG1pbiJ9.
+signature
+```
+
+- **Header**: 令牌类型（JWT）和签名算法（HS256）
+- **Payload**: 携带的数据（用户 ID、用户名、角色等）
+- **Signature**: 签名（防止篡改）
+
+### Express + JWT 实现
+
+```javascript
+// 安装依赖
+// npm install express jsonwebtoken bcryptjs
+
+const express = require('express')
+const jwt = require('jsonwebtoken')
+const bcrypt = require('bcryptjs')
+
+const app = express()
+app.use(express.json())
+
+const SECRET_KEY = 'your-secret-key'
+
+// 注册
+app.post('/register', async (req, res) => {
+  const { username, password } = req.body
+  
+  // 密码加密
+  const hashedPassword = await bcrypt.hash(password, 10)
+  
+  // 保存到数据库（示例）
+  const user = {
+    id: 1,
+    username,
+    password: hashedPassword
+  }
+  
+  // 生成 JWT
+  const token = jwt.sign(
+    { id: user.id, username: user.username },
+    SECRET_KEY,
+    { expiresIn: '24h' }
+  )
+  
+  res.json({ token })
+})
+
+// 登录
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body
+  
+  // 查询数据库（示例）
+  const user = {
+    id: 1,
+    username: 'admin',
+    password: await bcrypt.hash('123456', 10)
+  }
+  
+  // 验证密码
+  const isValid = await bcrypt.compare(password, user.password)
+  
+  if (!isValid) {
+    return res.status(401).json({ message: '用户名或密码错误' })
+  }
+  
+  // 生成 JWT
+  const token = jwt.sign(
+    { id: user.id, username: user.username },
+    SECRET_KEY,
+    { expiresIn: '24h' }
+  )
+  
+  res.json({ token })
+})
+
+// 验证 JWT 的中间件
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization']
+  const token = authHeader && authHeader.split(' ')[1] // "Bearer TOKEN"
+  
+  if (!token) {
+    return res.status(401).json({ message: '未提供 token' })
+  }
+  
+  jwt.verify(token, SECRET_KEY, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: 'token 无效或已过期' })
+    }
+    req.user = user
+    next()
+  })
+}
+
+// 需要认证的路由
+app.get('/profile', authenticateToken, (req, res) => {
+  res.json({ user: req.user })
+})
+
+app.listen(3000)
+```
+
+### JWT 的优缺点
+
+| 优点 | 缺点 |
+|------|------|
+| 无状态（服务器不保存会话） | 无法主动撤销 |
+| 适合分布式系统 | Payload 可以被解码（不要放敏感信息） |
+| 移动端友好 | 需要实现 token 刷新机制 |
+| 避免 CSRF | |
+
+## OAuth 2.0（第三方登录）
+
+### 工作流程（授权码模式）
+
+```
+1. 用户点击"使用 GitHub 登录"
+2. 跳转到 GitHub 授权页面
+3. 用户同意授权
+4. GitHub 回调你的网站，带上授权码（code）
+5. 你的服务器用 code 换取 access_token
+6. 用 access_token 调用 GitHub API 获取用户信息
+7. 登录成功
+```
+
+### Passport.js 实现 GitHub 登录
+
+```javascript
+// 安装依赖
+// npm install express passport passport-github2 express-session
+
+const express = require('express')
+const passport = require('passport')
+const GitHubStrategy = require('passport-github2').Strategy
+
+const app = express()
+
+// 配置 Session（Passport 需要）
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false
+}))
+
+app.use(passport.initialize())
+app.use(passport.session())
+
+// 配置 GitHub 策略
+passport.use(new GitHubStrategy({
+  clientID: 'your-github-client-id',
+  clientSecret: 'your-github-client-secret',
+  callbackURL: 'http://localhost:3000/auth/github/callback'
+}, (accessToken, refreshToken, profile, done) => {
+  // 这里可以保存用户信息到数据库
+  return done(null, profile)
+}))
+
+// 序列化/反序列化用户
+passport.serializeUser((user, done) => {
+  done(null, user)
+})
+
+passport.deserializeUser((user, done) => {
+  done(null, user)
+})
+
+// 路由
+app.get('/auth/github',
+  passport.authenticate('github', { scope: ['user:email'] })
+)
+
+app.get('/auth/github/callback',
+  passport.authenticate('github', { failureRedirect: '/login' }),
+  (req, res) => {
+    // 登录成功，跳转到首页
+    res.redirect('/')
+  }
+)
+
+app.get('/logout', (req, res) => {
+  req.logout(() => {
+    res.redirect('/')
+  })
+})
+
+app.listen(3000)
+```
+
+## RBAC 权限控制
+
+### 什么是 RBAC？
+
+**RBAC（Role-Based Access Control）**：基于角色的访问控制。
+
+```
+用户 <-> 角色 <-> 权限
+
+例子：
+- 用户：张三
+  - 角色：管理员
+    - 权限：创建用户、删除用户、查看报表
+
+- 用户：李四
+  - 角色：普通用户
+    - 权限：查看自己的资料、编辑自己的资料
+```
+
+### 数据库设计
+
+```sql
+-- 用户表
+CREATE TABLE users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(50) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL
+);
+
+-- 角色表
+CREATE TABLE roles (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- 权限表
+CREATE TABLE permissions (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(100) UNIQUE NOT NULL,
+  description TEXT
+);
+
+-- 用户-角色 关联表
+CREATE TABLE user_roles (
+  user_id INT,
+  role_id INT,
+  PRIMARY KEY (user_id, role_id),
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (role_id) REFERENCES roles(id)
+);
+
+-- 角色-权限 关联表
+CREATE TABLE role_permissions (
+  role_id INT,
+  permission_id INT,
+  PRIMARY KEY (role_id, permission_id),
+  FOREIGN KEY (role_id) REFERENCES roles(id),
+  FOREIGN KEY (permission_id) REFERENCES permissions(id)
+);
+
+-- 插入数据
+INSERT INTO roles (name) VALUES ('admin'), ('user');
+INSERT INTO permissions (name, description) VALUES
+  ('create_user', '创建用户'),
+  ('delete_user', '删除用户'),
+  ('view_report', '查看报表'),
+  ('edit_profile', '编辑个人资料');
+
+-- 管理员拥有所有权限
+INSERT INTO role_permissions (role_id, permission_id)
+SELECT 1, id FROM permissions;
+
+-- 普通用户只有编辑个人资料的权限
+INSERT INTO role_permissions (role_id, permission_id)
+VALUES (2, 4);
+```
+
+### Express + RBAC 实现
+
+```javascript
+// 权限检查中间件
+function checkPermission(permissionName) {
+  return async (req, res, next) => {
+    const userId = req.user.id
+    
+    // 查询用户是否拥有指定权限
+    const [rows] = await db.execute(`
+      SELECT COUNT(*) as count
+      FROM users u
+      JOIN user_roles ur ON u.id = ur.user_id
+      JOIN role_permissions rp ON ur.role_id = rp.role_id
+      JOIN permissions p ON rp.permission_id = p.id
+      WHERE u.id = ? AND p.name = ?
+    `, [userId, permissionName])
+    
+    if (rows[0].count === 0) {
+      return res.status(403).json({ message: '权限不足' })
+    }
+    
+    next()
+  }
+}
+
+// 使用权限中间件
+app.post('/users', 
+  authenticateToken, 
+  checkPermission('create_user'), 
+  (req, res) => {
+    // 只有拥有 create_user 权限的用户才能访问
+    res.json({ message: '用户创建成功' })
+  }
+)
+
+app.delete('/users/:id', 
+  authenticateToken, 
+  checkPermission('delete_user'), 
+  (req, res) => {
+    // 只有拥有 delete_user 权限的用户才能访问
+    res.json({ message: '用户删除成功' })
+  }
+)
+```
+
+## 安全最佳实践
+
+### 1. 密码安全
+
+```javascript
+const bcrypt = require('bcryptjs')
+
+// ✅ 正确：加密存储
+const hashedPassword = await bcrypt.hash(password, 10)
+
+// 验证密码
+const isValid = await bcrypt.compare(password, hashedPassword)
+
+// ❌ 错误：明文存储
+const password = '123456' // 永远不要这样做！
+```
+
+### 2. 防止暴力破解
+
+```javascript
+// 使用 rate-limit 限制登录尝试次数
+const rateLimit = require('express-rate-limit')
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 分钟
+  max: 5, // 最多 5 次尝试
+  message: '尝试次数过多，请 15 分钟后再试'
+})
+
+app.post('/login', loginLimiter, (req, res) => {
+  // 登录逻辑
+})
+```
+
+### 3. HTTPS
+
+```javascript
+// 使用 Helmet 增强安全
+const helmet = require('helmet')
+app.use(helmet())
+
+// 强制 HTTPS
+app.use((req, res, next) => {
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    next()
+  } else {
+    res.redirect(`https://${req.headers.host}${req.url}`)
+  }
+})
+```
+
+### 4. CORS 配置
+
+```javascript
+const cors = require('cors')
+
+app.use(cors({
+  origin: 'https://your-frontend.com', // 只允许指定域名
+  credentials: true // 允许携带 Cookie
+}))
+```
+
+## 小结
+
+✅ **已完成：**
+- 理解了认证和授权的区别
+- 学会了 Session 认证
+- 掌握了 JWT 认证
+- 了解了 OAuth 2.0 第三方登录
+- 学会了 RBAC 权限控制
+- 掌握了安全最佳实践
+
+🚀 **下一步：**
+- 学习微服务架构
+- 掌握 WebSocket 实时通信
+- 学习 GraphQL API 开发
+- 了解 Serverless 无服务器架构
+
+💡 **提示：** 永远不要在生产环境中使用明文密码，一定要加密存储！

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>✅ 自包含测试页面</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 60px 40px;
+      max-width: 800px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 { color: #333; margin-bottom: 20px; font-size: 2.5rem; }
+    .status { 
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-size: 1.1rem;
+    }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .test-section { margin: 30px 0; }
+    .test-section h2 { color: #555; margin-bottom: 15px; font-size: 1.5rem; }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 5px;
+      transition: all 0.3s;
+    }
+    button:hover { background: #764ba2; transform: translateY(-2px); }
+    #output {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .log-entry { margin: 2px 0; }
+    .log-entry::before { content: "> "; color: #667eea; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>✅ 自包含测试页面</h1>
+    
+    <div class="status success">
+      ✅ 如果你能看到这个绿色框，说明 HTML 和 CSS 正常加载！
+    </div>
+
+    <div class="test-section">
+      <h2>测试: JavaScript 执行</h2>
+      <div class="status info" id="test-result">等待测试...</div>
+      <button onclick="runTest()">运行测试</button>
+    </div>
+
+    <div class="test-section">
+      <h2>📊 测试输出</h2>
+      <div id="output">点击"运行测试"按钮开始...</div>
+    </div>
+
+    <div class="test-section">
+      <h2>ℹ️ 系统信息</h2>
+      <div class="status info" id="system-info">正在获取...</div>
+    </div>
+  </div>
+
+  <script>
+    // 获取输出容器
+    var output = document.getElementById('output');
+    var result = document.getElementById('test-result');
+    var systemInfo = document.getElementById('system-info');
+    
+    // 日志函数
+    function log(message) {
+      var time = new Date().toLocaleTimeString('zh-CN');
+      output.innerHTML += '<div class="log-entry">[' + time + '] ' + message + '</div>';
+      output.scrollTop = output.scrollHeight;
+    }
+    
+    // 运行测试
+    function runTest() {
+      try {
+        log('开始测试...');
+        log('✅ JavaScript 执行成功！');
+        log('当前时间: ' + new Date().toLocaleString('zh-CN'));
+        log('用户代理: ' + navigator.userAgent);
+        log('屏幕分辨率: ' + screen.width + 'x' + screen.height);
+        log('窗口大小: ' + window.innerWidth + 'x' + window.innerHeight);
+        log('✅ 所有测试完成！');
+        
+        result.className = 'status success';
+        result.innerHTML = '✅ JavaScript 执行成功！';
+      } catch (e) {
+        log('❌ 测试失败: ' + e.message);
+        result.className = 'status error';
+        result.innerHTML = '❌ 测试失败: ' + e.message;
+      }
+    }
+    
+    // 显示系统信息
+    function showSystemInfo() {
+      var info = '';
+      info += '用户代理: ' + navigator.userAgent + '<br>';
+      info += '平台: ' + navigator.platform + '<br>';
+      info += '语言: ' + navigator.language + '<br>';
+      info += 'Cookie 启用: ' + navigator.cookieEnabled + '<br>';
+      info += '在线状态: ' + navigator.onLine + '<br>';
+      systemInfo.innerHTML = info;
+    }
+    
+    // 页面加载完成后自动运行测试
+    window.onload = function() {
+      log('页面加载完成！');
+      log('自动运行测试...');
+      showSystemInfo();
+      runTest();
+    };
+  </script>
+</body>
+</html>

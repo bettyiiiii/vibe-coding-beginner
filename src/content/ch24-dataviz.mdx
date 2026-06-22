@@ -1,0 +1,706 @@
+---
+title: "项目实战：数据可视化"
+chapter: "24"
+description: "学习 D3.js、ECharts、Chart.js 等数据可视化库，掌握数据图表开发"
+---
+
+# 项目实战：数据可视化
+
+> 一图胜千言，数据可视化让数据"说话"。
+
+## 为什么需要数据可视化？
+
+### 数据 vs 图表
+
+```
+原始数据：
+月份,销售额
+1月,12000
+2月,15000
+3月,18000
+4月,13000
+5月,20000
+6月,22000
+
+问题：很难看出趋势！
+```
+
+```
+可视化后（折线图）：
+📈 销售额从 1.2万涨到 2.2万，5 月有明显增长
+
+优势：一目了然！
+```
+
+## 常见图表类型
+
+| 图表类型 | 适用场景 | 例子 |
+|----------|----------|------|
+| 折线图 | 趋势变化 | 销售额趋势、温度变化 |
+| 柱状图 | 分类比较 | 各产品销量对比 |
+| 饼图 | 占比关系 | 市场份额、预算分配 |
+| 散点图 | 相关性分析 | 身高 vs 体重 |
+| 热力图 | 密度分布 | 网站点击热力图 |
+| 地图 | 地理数据 | 全国销售分布 |
+
+## D3.js（高级定制）
+
+### 什么是 D3.js？
+
+D3.js（Data-Driven Documents）是一个基于数据的文档操作库。
+
+**特点：**
+- 完全控制 SVG 生成
+- 强大的数据绑定
+- 丰富的过渡动画
+- 学习曲线陡峭
+
+### 安装 D3.js
+
+```bash
+npm install d3
+```
+
+### 基础示例：柱状图
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>D3 柱状图</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <div id="chart"></div>
+  
+  <script>
+    // 数据
+    const data = [
+      { name: '产品A', value: 100 },
+      { name: '产品B', value: 150 },
+      { name: '产品C', value: 80 },
+      { name: '产品D', value: 200 }
+    ]
+    
+    // 尺寸
+    const width = 600
+    const height = 400
+    const margin = { top: 20, right: 20, bottom: 30, left: 40 }
+    
+    // 创建 SVG
+    const svg = d3.select('#chart')
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height)
+    
+    // 比例尺（X 轴）
+    const xScale = d3.scaleBand()
+      .domain(data.map(d => d.name))
+      .range([margin.left, width - margin.right])
+      .padding(0.1)
+    
+    // 比例尺（Y 轴）
+    const yScale = d3.scaleLinear()
+      .domain([0, d3.max(data, d => d.value)])
+      .range([height - margin.bottom, margin.top])
+    
+    // 绘制柱状图
+    svg.selectAll('rect')
+      .data(data)
+      .enter()
+      .append('rect')
+      .attr('x', d => xScale(d.name))
+      .attr('y', d => yScale(d.value))
+      .attr('width', xScale.bandwidth())
+      .attr('height', d => height - margin.bottom - yScale(d.value))
+      .attr('fill', 'steelblue')
+    
+    // X 轴
+    svg.append('g')
+      .attr('transform', `translate(0, ${height - margin.bottom})`)
+      .call(d3.axisBottom(xScale))
+    
+    // Y 轴
+    svg.append('g')
+      .attr('transform', `translate(${margin.left}, 0)`)
+      .call(d3.axisLeft(yScale))
+  </script>
+</body>
+</html>
+```
+
+### 进阶：力导向图（关系网络）
+
+```javascript
+// 节点和边数据
+const nodes = [
+  { id: 'Alice' },
+  { id: 'Bob' },
+  { id: 'Charlie' },
+  { id: 'David' }
+]
+
+const links = [
+  { source: 'Alice', target: 'Bob' },
+  { source: 'Alice', target: 'Charlie' },
+  { source: 'Bob', target: 'David' }
+]
+
+// 创建力导向图
+const simulation = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(links).id(d => d.id))
+  .force('charge', d3.forceManyBody())
+  .force('center', d3.forceCenter(width / 2, height / 2))
+
+// 绘制边
+const link = svg.selectAll('line')
+  .data(links)
+  .enter()
+  .append('line')
+  .attr('stroke', '#999')
+
+// 绘制节点
+const node = svg.selectAll('circle')
+  .data(nodes)
+  .enter()
+  .append('circle')
+  .attr('r', 10)
+  .attr('fill', 'steelblue')
+  .call(d3.drag()
+    .on('start', dragstarted)
+    .on('drag', dragged)
+    .on('end', dragended))
+
+// 拖拽事件
+function dragstarted(event, d) {
+  simulation.alphaTarget(0.3).restart()
+  d.fx = d.x
+  d.fy = d.y
+}
+
+function dragged(event, d) {
+  d.fx = event.x
+  d.fy = event.y
+}
+
+function dragended(event, d) {
+  simulation.alphaTarget(0)
+  d.fx = null
+  d.fy = null
+}
+
+// 更新位置
+simulation.on('tick', () => {
+  link
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y)
+  
+  node
+    .attr('cx', d => d.x)
+    .attr('cy', d => d.y)
+})
+```
+
+## ECharts（企业级）
+
+### 为什么选择 ECharts？
+
+| 特性 | D3.js | ECharts |
+|----------|--------|---------|
+| 易用性 | 复杂 | 简单 |
+| 定制性 | 极强 | 强 |
+| 中文文档 | ❌ | ✅ |
+| 图表类型 | 需自己实现 | 内置丰富 |
+| 适配移动端 | 需自己实现 | 内置响应式 |
+
+### 安装 ECharts
+
+```bash
+npm install echarts
+```
+
+### 基础示例：折线图
+
+```javascript
+// main.js
+import * as echarts from 'echarts'
+
+// 初始化
+const chart = echarts.init(document.getElementById('chart'))
+
+// 配置项
+const option = {
+  title: {
+    text: '销售额趋势'
+  },
+  tooltip: {
+    trigger: 'axis'
+  },
+  xAxis: {
+    type: 'category',
+    data: ['1月', '2月', '3月', '4月', '5月', '6月']
+  },
+  yAxis: {
+    type: 'value'
+  },
+  series: [
+    {
+      name: '销售额',
+      type: 'line',
+      data: [12000, 15000, 18000, 13000, 20000, 22000],
+      smooth: true,  // 平滑曲线
+      areaStyle: {  // 面积图
+        color: 'rgba(54, 162, 235, 0.2)'
+      }
+    }
+  ]
+}
+
+// 设置配置
+chart.setOption(option)
+
+// 响应式
+window.addEventListener('resize', () => {
+  chart.resize()
+})
+```
+
+### 复杂示例：混合图表
+
+```javascript
+const option = {
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: {
+      type: 'cross'
+    }
+  },
+  legend: {
+    data: ['销售额', '利润率']
+  },
+  xAxis: {
+    type: 'category',
+    data: ['1月', '2月', '3月', '4月', '5月', '6月']
+  },
+  yAxis: [
+    {
+      type: 'value',
+      name: '销售额',
+      position: 'left'
+    },
+    {
+      type: 'value',
+      name: '利润率',
+      position: 'right',
+      formatter: '{value}%'
+    }
+  ],
+  series: [
+    {
+      name: '销售额',
+      type: 'bar',
+      data: [12000, 15000, 18000, 13000, 20000, 22000]
+    },
+    {
+      name: '利润率',
+      type: 'line',
+      yAxisIndex: 1,  // 使用右侧 Y 轴
+      data: [15, 18, 20, 12, 25, 28]
+    }
+  ]
+}
+```
+
+### 地图可视化
+
+```javascript
+// 注册中国地图
+import * as echarts from 'echarts'
+import 'echarts/map/js/china'
+
+const option = {
+  title: {
+    text: '全国销售分布'
+  },
+  visualMap: {
+    min: 0,
+    max: 1000,
+    text: ['高', '低'],
+    calculable: true
+  },
+  series: [
+    {
+      name: '销售额',
+      type: 'map',
+      map: 'china',
+      data: [
+        { name: '北京', value: 900 },
+        { name: '上海', value: 800 },
+        { name: '广东', value: 700 }
+        // ...
+      ]
+    }
+  ]
+}
+```
+
+## Chart.js（轻量级）
+
+### 为什么选择 Chart.js？
+
+- 简单易用
+- 响应式设计
+- 8 种图表类型
+- 动画效果出色
+
+### 安装 Chart.js
+
+```bash
+npm install chart.js
+```
+
+### 基础示例：饼图
+
+```javascript
+// main.js
+import { Chart, registerables } from 'chart.js'
+
+Chart.register(...registerables)
+
+const ctx = document.getElementById('chart').getContext('2d')
+
+const chart = new Chart(ctx, {
+  type: 'pie',
+  data: {
+    labels: ['产品A', '产品B', '产品C', '产品D'],
+    datasets: [{
+      data: [30, 25, 20, 25],
+      backgroundColor: [
+        'rgba(255, 99, 132, 0.8)',
+        'rgba(54, 162, 235, 0.8)',
+        'rgba(255, 206, 86, 0.8)',
+        'rgba(75, 192, 192, 0.8)'
+      ]
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top'
+      },
+      title: {
+        display: true,
+        text: '产品销量占比'
+      }
+    }
+  }
+})
+```
+
+### 动态更新数据
+
+```javascript
+// 添加数据
+function addData(chart, label, newData) {
+  chart.data.labels.push(label)
+  chart.data.datasets.forEach((dataset) => {
+    dataset.data.push(newData)
+  })
+  chart.update()
+}
+
+// 移除数据
+function removeData(chart) {
+  chart.data.labels.pop()
+  chart.data.datasets.forEach((dataset) => {
+    dataset.data.pop()
+  })
+  chart.update()
+}
+
+// 更新数据
+function updateData(chart, index, newData) {
+  chart.data.datasets.forEach((dataset) => {
+    dataset.data[index] = newData
+  })
+  chart.update()
+}
+```
+
+## React 集成（React-Chart-js）
+
+### 安装
+
+```bash
+npm install react-chart-js chart.js
+```
+
+### 使用示例
+
+```jsx
+// ChartComponent.jsx
+import { useState, useEffect } from 'react'
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
+import { Pie } from 'react-chart-js'
+
+ChartJS.register(ArcElement, Tooltip, Legend)
+
+function ChartComponent() {
+  const [data, setData] = useState({
+    labels: ['产品A', '产品B', '产品C'],
+    datasets: [{
+      data: [300, 250, 200],
+      backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56']
+    }]
+  })
+  
+  return (
+    <div>
+      <h2>产品销量占比</h2>
+      <Pie data={data} />
+    </div>
+  )
+}
+
+export default ChartComponent
+```
+
+## 实战：销售数据仪表盘
+
+### 项目结构
+
+```
+sales-dashboard/
+├── src/
+│   ├── components/
+│   │   ├── SalesChart.jsx      # 销售额趋势
+│   │   ├── CategoryPie.jsx     # 品类占比
+│   │   ├── RegionMap.jsx       # 地区分布
+│   │   └── StatsCard.jsx      # 统计卡片
+│   ├── App.jsx
+│   └── main.jsx
+└── package.json
+```
+
+### 实现销售趋势图
+
+```jsx
+// components/SalesChart.jsx
+import { useState, useEffect } from 'react'
+import { Line } from 'react-chart-js'
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
+
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+
+function SalesChart() {
+  const [salesData, setSalesData] = useState(null)
+  
+  useEffect(() => {
+    // 获取销售数据
+    fetch('/api/sales')
+      .then(res => res.json())
+      .then(data => {
+        setSalesData({
+          labels: data.map(item => item.month),
+          datasets: [{
+            label: '销售额',
+            data: data.map(item => item.amount),
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+          }]
+        })
+      })
+  }, [])
+  
+  if (!salesData) return <div>加载中...</div>
+  
+  return (
+    <div className="chart-container">
+      <h3>销售趋势</h3>
+      <Line data={salesData} options={{
+        responsive: true,
+        plugins: {
+          legend: { position: 'top' }
+        }
+      }} />
+    </div>
+  )
+}
+
+export default SalesChart
+```
+
+### 实现统计卡片
+
+```jsx
+// components/StatsCard.jsx
+function StatsCard({ title, value, change, icon }) {
+  const isPositive = change >= 0
+  
+  return (
+    <div className="stats-card">
+      <div className="stats-header">
+        <span className="stats-title">{title}</span>
+        <span className="stats-icon">{icon}</span>
+      </div>
+      <div className="stats-value">{value}</div>
+      <div className={`stats-change ${isPositive ? 'positive' : 'negative'}`}>
+        {isPositive ? '+' : ''}{change}%
+      </div>
+    </div>
+  )
+}
+
+export default StatsCard
+```
+
+### 主页面
+
+```jsx
+// App.jsx
+import SalesChart from './components/SalesChart'
+import CategoryPie from './components/CategoryPie'
+import RegionMap from './components/RegionMap'
+import StatsCard from './components/StatsCard'
+
+function App() {
+  return (
+    <div className="dashboard">
+      <header>
+        <h1>销售数据仪表盘</h1>
+      </header>
+      
+      <div className="stats-row">
+        <StatsCard title="总销售额" value="¥128,000" change={12.5} icon="💰" />
+        <StatsCard title="订单数" value="1,234" change={-3.2} icon="📦" />
+        <StatsCard title="客单价" value="¥103.7" change={5.8} icon="🛒" />
+        <StatsCard title="新增用户" value="328" change={18.3} icon="👥" />
+      </div>
+      
+      <div className="charts-row">
+        <div className="chart-large">
+          <SalesChart />
+        </div>
+        <div className="chart-small">
+          <CategoryPie />
+        </div>
+      </div>
+      
+      <div className="charts-row">
+        <div className="chart-full">
+          <RegionMap />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default App
+```
+
+## 性能优化
+
+### 1. 懒加载图表
+
+```javascript
+// 使用 Intersection Observer 懒加载
+const ChartComponent = () => {
+  const ref = useRef(null)
+  const [isVisible, setIsVisible] = useState(false)
+  
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.1 }
+    )
+    
+    if (ref.current) {
+      observer.observe(ref.current)
+    }
+    
+    return () => observer.disconnect()
+  }, [])
+  
+  return (
+    <div ref={ref}>
+      {isVisible ? <ExpensiveChart /> : <div>加载中...</div>}
+    </div>
+  )
+}
+```
+
+### 2. 数据采样
+
+```javascript
+// 数据量太大时，进行采样
+function sampleData(data, maxPoints = 1000) {
+  if (data.length <= maxPoints) return data
+  
+  const sampled = []
+  const step = Math.floor(data.length / maxPoints)
+  
+  for (let i = 0; i < data.length; i += step) {
+    sampled.push(data[i])
+  }
+  
+  return sampled
+}
+```
+
+### 3. 使用 Web Worker
+
+```javascript
+// worker.js
+self.onmessage = (e) => {
+  const { data, type } = e.data
+  
+  let result
+  if (type === 'heavy-calculation') {
+    // 在 Worker 中执行重计算
+    result = performHeavyCalculation(data)
+  }
+  
+  self.postMessage(result)
+}
+
+// 主线程
+const worker = new Worker('worker.js')
+
+worker.postMessage({
+  data: largeDataSet,
+  type: 'heavy-calculation'
+})
+
+worker.onmessage = (e) => {
+  const result = e.data
+  updateChart(result)
+}
+```
+
+## 小结
+
+✅ **已完成：**
+- 理解了数据可视化的重要性
+- 学会了 D3.js 基础用法
+- 掌握了 ECharts 企业级图表
+- 学会了 Chart.js 轻量级图表
+- 实现了销售数据仪表盘
+- 了解了性能优化技巧
+
+🎉 **恭喜！** 你已经完成了所有 24 章的学习，从零基础到全栈开发，再到数据可视化，你已经掌握了现代 Web 开发的核心技能！
+
+💡 **下一步建议：**
+- 深入学习某个特定领域（前端/后端/全栈）
+- 参与开源项目，积累实战经验
+- 学习软件工程、架构设计等高级主题
+- 构建自己的作品集（Portfolio）
+
+💡 **提示：** 数据可视化是一门艺术，多参考优秀案例（如 NYTimes、FiveThirtyEight）！

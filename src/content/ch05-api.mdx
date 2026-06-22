@@ -1,0 +1,125 @@
+# API 调用实战
+
+> API 就像「点外卖」——你下单，厨房做，外卖员把结果送回来。
+
+---
+
+## API 是什么？（点外卖比喻）
+
+**API = 应用程序接口（Application Programming Interface）**
+
+**生活比喻 —— 点外卖：**
+
+| 外卖流程 | 对应 API 概念 |
+|---------|---------------|
+| 你（下单的人） | 你的代码 |
+| 菜单（可选什么） | API 文档 |
+| 外卖平台（接单） | API 服务器 |
+| 外卖员送餐 | API 响应（Response） |
+| 你收到的饭 | 返回的数据（JSON） |
+
+**一句话总结：** API 让你**不用自己做**，就能「调用别人的功能」。
+
+---
+
+## 用 AI 帮你写第一个 API 调用
+
+### 实战：获取实时天气
+
+下面是一段**可以真正运行的代码**，让 AI 帮你写出来：
+
+```javascript
+// 让 AI 帮你写：调用天气 API 的代码
+// 提示词：
+// 「帮我写一个调用 OpenWeatherMap API 获取北京天气的 JavaScript 代码，
+//  用 fetch，把结果打印到控制台，加详细注释，我是初学者」
+```
+
+### AI 会给你类似这样的代码：
+
+```javascript
+// 你的任务是：获取北京的实时天气
+const apiKey = '你的API密钥'  // 去 openweathermap.org 免费申请
+const city = 'Beijing'
+const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=zh_cn`
+
+// fetch 就是「点外卖」：向 API 地址发送请求
+fetch(url)
+  .then(response => response.json())  // 把返回的数据转成 JSON 格式
+  .then(data => {
+    console.log('城市：' + data.name)
+    console.log('温度：' + data.main.temp + '°C')
+    console.log('天气：' + data.weather[0].description)
+  })
+  .catch(error => {
+    console.log('出错了：' + error)  // 出错时执行这里
+  })
+```
+
+<AiExplainBtn explanation="`fetch()` 是浏览器内置的「发请求」函数。`.then()` 是「等结果回来后做什么」。`response.json()` 把服务器返回的字符串转成 JavaScript 对象。`catch()` 是出错时的「保险」——网络出错或 API 挂了会走这里。" />
+
+---
+
+## 如何获取 API Key？
+
+大部分免费 API 都需要**注册获取密钥**（就像办一张「取餐卡」）。
+
+### 推荐初学者使用的免费 API：
+
+| API | 能做什么 | 免费额度 | 申请地址 |
+|-----|---------|---------|---------|
+| OpenWeatherMap | 获取天气 | 1000次/天 | openweathermap.org |
+| 有道翻译 | 文本翻译 | 免费 | ai.youdao.com |
+| NASA API | 太空图片/数据 | 完全免费 | api.nasa.gov |
+| JSONPlaceholder | 假数据（练手用） | 完全免费 | jsonplaceholder.typicode.com |
+
+<Callout type="warning" title="API Key 安全提醒">
+不要把 API Key 直接写在公开的代码里！
+真正上线时，需要用「后端代理」保护 Key。
+初学者阶段，直接用没问题（因为是练手项目）。
+</Callout>
+
+---
+
+## 常见问题排查
+
+### 问题1：代码没反应 / 控制台没输出
+
+**排查步骤：**
+1. 按 F12 打开浏览器控制台
+2. 看「Console」标签页有没有红色报错
+3. 把红色报错**完整复制**给 AI
+
+### 问题2：`fetch is not defined`
+
+说明你在 Node.js 环境跑浏览器代码。
+解决：在浏览器里跑（保存为 `.html` 文件，用 `<script>` 引入）
+
+### 问题3：API 返回 `401` 错误
+
+**原因：** API Key 错了，或者没传 Key
+**解决：** 检查 Key 是否复制完整，是否包含多余空格
+
+<AiExplainBtn explanation="HTTP 状态码是服务器的「回复手势」：200=成功，401=没权限（Key 错了），404=找不到地址，500=服务器内部出错。看到数字就能猜出问题大概在哪。" />
+
+---
+
+## 小练习
+
+1. **改城市：** 把代码里的 `Beijing` 改成你所在的城市，看看结果
+2. **加功能：** 让 AI 帮你加上「显示湿度」和「显示风速」
+3. **换 API：** 用 NASA API 获取一张今天的「太空图片」
+
+<Callout type="tip" title="关键点">
+API 调用的套路永远是：
+**1. 拿到 API 地址和 Key**
+→ **2. 用 fetch 发请求**
+→ **3. 处理返回的数据（.then）**
+→ **4. 出错时 catch**
+</Callout>
+
+---
+
+## 下一章预告
+
+下一章是最后一章：**下一步去哪**——进阶资源、社区推荐，开启你的独立开发之旅！

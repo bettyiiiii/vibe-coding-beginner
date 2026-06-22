@@ -1,0 +1,352 @@
+# Ch04 · 读懂和修改 AI 代码
+
+> 真正掌握 Vibe Coding 的标志：**AI 写的代码，你能看懂、能修改、能 debug。**
+
+---
+
+## 为什么必须学会读代码？
+
+很多人用 AI 写代码，但**完全看不懂 AI 写了什么**——这是非常危险的。
+
+| 场景 | 看不懂代码 | 看得懂代码 |
+|------|--------------|--------------|
+| AI 生成了 100 行代码 | 不知道对不对，只能运行试试 | 扫一眼就知道逻辑，能指出问题 |
+| 需求变更 | 重新让 AI 生成整个文件 | 精准修改 3-5 行，其余不动 |
+| 代码报错 | 把错误扔给 AI，反复多轮 | 能定位到具体哪一行，精准提问 |
+| 代码审查 | 无法审查，盲目信任 AI | 能发现 AI 的 bug，主动修正 |
+
+> 💡 **核心结论**：读代码的能力 = 你驾驭 AI 的能力上限。
+
+---
+
+## 第一步：建立「代码阅读框架」
+
+不要试图一次性理解所有细节——**分层阅读**。
+
+### 代码阅读三层法
+
+```
+第一层：结构层（5 分钟）
+→ 这个文件有哪些函数？每个函数大概做什么？
+→ 数据是怎么流动的？（输入 → 处理 → 输出）
+
+第二层：逻辑层（15 分钟）
+→ 每个函数内部是怎么工作的？
+→ 条件判断、循环、返回值分别是什么？
+
+第三层：细节层（根据需要）
+→ 某一行代码的具体语法是什么意思？
+→ 为什么用这个方法而不是另一种？
+```
+
+---
+
+## 实战演练：读懂一段 AI 生成的代码
+
+### AI 生成的代码（JavaScript：待办清单核心逻辑）
+
+```javascript
+import { useState } from 'react'
+
+function TodoApp() {
+  const [todos, setTodos] = useState([])
+  const [input, setInput] = useState('')
+
+  const addTodo = () => {
+    if (!input.trim()) return
+    setTodos([...todos, { id: Date.now(), text: input, done: false }])
+    setInput('')
+  }
+
+  const toggleTodo = (id) => {
+    setTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t))
+  }
+
+  const deleteTodo = (id) => {
+    setTodos(todos.filter(t => t.id !== id))
+  }
+
+  return (
+    <div>
+      <input value={input} onChange={e => setInput(e.target.value)} />
+      <button onClick={addTodo}>添加</button>
+      {todos.map(t => (
+        <div key={t.id}>
+          <span onClick={() => toggleTodo(t.id)} style={{ textDecoration: t.done ? 'line-through' : 'none' }}>
+            {t.text}
+          </span>
+          <button onClick={() => deleteTodo(t.id)}>删除</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+```
+
+---
+
+### 第一层：结构层阅读
+
+**你先不急着看每行代码**，而是问：
+
+1. **这个组件叫什么？** → `TodoApp`
+2. **它用了哪些状态（useState）？** → `todos`（待办数组）、`input`（输入框文字）
+3. **它有哪些函数？** → `addTodo`、`toggleTodo`、`deleteTodo`
+4. **它的 UI 长什么样？** → 一个输入框 + 添加按钮 + 待办列表
+
+> ✅ **第一层目标**：不看细节，先搞清楚「这个文件是干什么的」。
+
+---
+
+### 第二层：逻辑层阅读
+
+现在深入每个函数：
+
+#### `addTodo` 函数
+
+```javascript
+const addTodo = () => {
+  if (!input.trim()) return          // ① 如果输入为空，直接退出
+  setTodos([...todos, { id: Date.now(), text: input, done: false }])  // ② 添加新待办
+  setInput('')                       // ③ 清空输入框
+}
+```
+
+**逐行解释**：
+
+| 行 | 代码 | 含义 |
+|---|------|------|
+| ① | `if (!input.trim()) return` | 防止添加空待办（`trim()` 去掉首尾空格） |
+| ② | `setTodos([...todos, ...])` | 用展开运算符 `[...todos]` 复制旧数组，加上新待办对象 |
+| ③ | `setInput('')` | 添加后清空输入框 |
+
+**新待办对象的结构**：
+```javascript
+{
+  id: Date.now(),      // 用时间戳作为唯一 ID
+  text: input,        // 待办文字
+  done: false         // 是否完成（默认未完成）
+}
+```
+
+#### `toggleTodo` 函数（最难的一行）
+
+```javascript
+const toggleTodo = (id) => {
+  setTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t))
+}
+```
+
+**拆开理解**：
+
+```javascript
+// 等价于：
+setTodos(
+  todos.map(t => {           // 遍历每个待办
+    if (t.id === id) {       // 找到被点击的那个
+      return { ...t, done: !t.done }   // 复制它，并把 done 取反
+    } else {
+      return t                     // 其他待办不变
+    }
+  })
+)
+```
+
+**关键点**：
+- `map()` 会返回一个**新数组**（React 要求不可变更新）
+- `{ ...t, done: !t.done }` 是「复制对象 + 修改一个字段」的语法
+
+#### `deleteTodo` 函数
+
+```javascript
+const deleteTodo = (id) => {
+  setTodos(todos.filter(t => t.id !== id))  // 保留「不是我要删除的」那些
+}
+```
+
+**`filter()` 的生活化比喻**：
+> 就像「筛子」——把不符合条件的筛掉，剩下的组成新数组。
+
+---
+
+### 第三层：细节层（根据需要）
+
+如果你对某个语法不懂，**精准提问 AI**：
+
+```
+你：「...todos.map(t => t.id === id ? { ...t, done: !t.done } : t)」
+    这一行我看不懂，请：
+1. 解释 map() 的作用
+2. 解释三元运算符 ? : 在这里的含义
+3. 解释 { ...t, done: !t.done } 这个展开运算符做了什么
+
+用生活化比喻，不要用专业术语。
+```
+
+---
+
+## 修改 AI 代码：实战技巧
+
+### 场景 1：添加新功能（编辑待办）
+
+**你**：“我想让用户能编辑已存在的待办。”
+
+**错误做法**：让 AI 重新生成整个文件（会引入新 bug）。
+
+**正确做法**：精准告诉 AI 要改哪里。
+
+```
+【背景】我有一个待办清单应用，代码如下：[粘贴代码]
+
+【需求】我想添加「编辑待办」功能：
+1. 每个待办旁边加一个「编辑」按钮
+2. 点击后，待办文字变成一个输入框
+3. 修改后按回车保存
+
+【要求】
+- 只修改需要改的部分，不要重写整个文件
+- 告诉我你改了哪几行，为什么
+```
+
+**AI 可能返回的修改**（重点看注释）：
+
+```javascript
+// ✅ 新增：编辑状态用一个新的 state
+const [editingId, setEditingId] = useState(null)
+const [editText, setEditText] = useState('')
+
+// ✅ 新增：进入编辑模式
+const startEdit = (todo) => {
+  setEditingId(todo.id)
+  setEditText(todo.text)
+}
+
+// ✅ 新增：保存编辑
+const saveEdit = () => {
+  setTodos(todos.map(t =>
+    t.id === editingId ? { ...t, text: editText } : t
+  ))
+  setEditingId(null)
+  setEditText('')
+}
+
+// ✅ 修改：render 部分，区分「查看模式」和「编辑模式」
+{todos.map(t => (
+  <div key={t.id}>
+    {editingId === t.id ? (             // ← 如果在编辑模式
+      <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => e.key === 'Enter' && saveEdit()} />
+    ) : (                                    // ← 否则显示文字
+      <span onClick={() => toggleTodo(t.id)}>{t.text}</span>
+    )}
+    <button onClick={() => startEdit(t)}>编辑</button>
+    <button onClick={() => deleteTodo(t.id)}>删除</button>
+  </div>
+))}
+```
+
+**关键点**：AI 告诉你**它改了哪几行**（这才是你需要的！）
+
+---
+
+## 调试技巧：当 AI 代码报错时
+
+### 步骤 1：读懂错误信息
+
+| 错误类型 | 含义 | 常见原因 |
+|----------|------|----------|
+| `TypeError: Cannot read property 'map' of undefined` | 你对一个 `undefined` 用了 `.map()` | 数据还没加载完 / API 返回了空 |
+| `SyntaxError: Unexpected token` | 语法错误（少了括号、引号不匹配） | AI 生成的代码有时候会漏括号 |
+| `ReferenceError: X is not defined` | 使用了一个未声明的变量 | AI 可能用了不在作用域的变量 |
+
+### 步骤 2：用 `console.log` 调试
+
+**不要猜测——打印出来看！**
+
+```javascript
+const toggleTodo = (id) => {
+  console.log('toggleTodo 被调用，id =', id)  // ← 加这行
+  console.log('当前的 todos =', todos)              // ← 加这行
+  setTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t))
+}
+```
+
+### 步骤 3：把错误 + 你的调试信息发给 AI
+
+```
+【背景】我的待办应用有一个 bug。
+
+【错误信息】
+TypeError: Cannot read property 'map' of undefined
+     at TodoApp (App.js:15)
+
+【我的调试信息】
+我在 toggleTodo 函数里打印了 todos，发现它是 undefined。
+
+【相关代码】
+[粘贴代码]
+
+【我的疑问】
+为什么 todos 会变成 undefined？我哪里错了吗？
+```
+
+> ✅ **这样提问，AI 能精准定位问题**，而不是瞎猜。
+
+---
+
+## 实战练习：读懂一个完整项目
+
+### 练习：用「三层阅读法」读懂以下 AI 生成的天气查询代码
+
+```javascript
+import { useState } from 'react'
+
+function WeatherApp() {
+  const [city, setCity] = useState('')
+  const [weather, setWeather] = useState(null)
+  const [error, setError] = useState('')
+
+  const fetchWeather = async () => {
+    setError('')
+    try {
+      const res = await fetch(`https://api.weatherapi.com/v1/current.json?key=YOUR_KEY&q=${city}`)
+      if (!res.ok) throw new Error('城市未找到')
+      const data = await res.json()
+      setWeather(data)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  return (
+    <div>
+      <input value={city} onChange={e => setCity(e.target.value)} placeholder="输入城市" />
+      <button onClick={fetchWeather}>查询</button>
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {weather && (
+        <div>
+          <h2>{weather.location.name}</h2>
+          <p>{weather.current.temp_c}°C {weather.current.condition.text}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+**你的任务**（写下答案）：
+
+1. **第一层**：这个组件有哪些状态？核心功能是什么？
+2. **第二层**：`fetchWeather` 函数每一步在做什么？
+3. **第三层**：`await` 是什么意思？为什么要用 `try...catch`？
+
+> ✅ **完成后，把你的答案发给 AI，让它批改**。
+
+---
+
+## 下一步
+
+- 如果你能读懂本章 80% 的内容 → 进入 [Ch05：交互、DOM、API 调用]
+- 如果还有困惑 → 把不懂的代码发给 AI，用「三层阅读法」让它逐层解释
+- 如果想看更多调试技巧 → 访问 [常见错误排查]（首页 → 工具模块）
+
+> 🎯 **终极目标**：AI 写的代码，你要能做到——**看懂逻辑 → 发现 bug → 精准修改 → 独立调试**。

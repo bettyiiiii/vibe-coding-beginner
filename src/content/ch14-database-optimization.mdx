@@ -1,0 +1,445 @@
+---
+title: "数据库优化实战"
+chapter: "14"
+description: "学习 SQL 查询优化、索引设计、数据库范式、NoSQL 选择，掌握高并发场景下的数据库性能调优"
+---
+
+# 数据库优化实战
+
+> 数据库是应用的心脏，性能优化是每位后端开发者的必修课。
+
+## 数据库性能问题诊断
+
+### 常见性能瓶颈
+
+1. **慢查询**: SQL 执行时间过长
+2. **索引缺失**: 全表扫描
+3. **连接池耗尽**: 并发请求过多
+4. **锁竞争**: 事务冲突
+5. **硬件瓶颈**: CPU、内存、磁盘 I/O
+
+### 性能分析工具
+
+```sql
+-- MySQL: 开启慢查询日志
+SET GLOBAL slow_query_log = 'ON';
+SET GLOBAL long_query_time = 2; -- 超过 2 秒的查询
+
+-- 查看慢查询
+SHOW VARIABLES LIKE 'slow_query%';
+
+-- 使用 EXPLAIN 分析查询
+EXPLAIN SELECT * FROM users WHERE email = 'user@example.com';
+```
+
+```javascript
+// Node.js: 使用 mysql2 的性能监控
+const mysql = require('mysql2/promise')
+
+const pool = mysql.createPool({
+  host: 'localhost',
+  user: 'root',
+  password: 'password',
+  database: 'mydb',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
+})
+
+// 监听查询事件
+pool.on('acquire', (connection) => {
+  console.log('Connection %d acquired', connection.threadId)
+})
+
+pool.on('release', (connection) => {
+  console.log('Connection %d released', connection.threadId)
+})
+```
+
+## 索引优化
+
+### 索引类型
+
+| 索引类型 | 说明 | 适用场景 |
+|----------|------|----------|
+| PRIMARY KEY | 主键索引，唯一且非空 | 每行数据的唯一标识 |
+| UNIQUE | 唯一索引 | 邮箱、用户名等唯一字段 |
+| INDEX | 普通索引 | 经常查询的字段 |
+| FULLTEXT | 全文索引 | 文章内容搜索 |
+| SPATIAL | 空间索引 | 地理位置数据 |
+
+### 创建索引
+
+```sql
+-- 创建主键索引
+ALTER TABLE users ADD PRIMARY KEY (id);
+
+-- 创建唯一索引
+CREATE UNIQUE INDEX idx_email ON users(email);
+
+-- 创建普通索引
+CREATE INDEX idx_created_at ON users(created_at);
+
+-- 创建复合索引
+CREATE INDEX idx_name_age ON users(name, age);
+
+-- 删除索引
+DROP INDEX idx_name_age ON users;
+```
+
+### 索引最佳实践
+
+```sql
+-- ✅ 好例子：索引覆盖
+-- 查询的字段都在索引中
+CREATE INDEX idx_cover ON users(name, age, email);
+SELECT name, age, email FROM users WHERE name = 'John';
+
+-- ❌ 坏例子：索引失效
+-- 使用函数
+SELECT * FROM users WHERE YEAR(created_at) = 2026;
+
+-- 使用 LIKE '%xxx'
+SELECT * FROM users WHERE name LIKE '%John%';
+
+-- 类型转换
+SELECT * FROM users WHERE id = '1'; -- id 是 INT
+
+-- OR 条件（可能导致索引失效）
+SELECT * FROM users WHERE name = 'John' OR age = 25;
+```
+
+### 复合索引的最左前缀原则
+
+```sql
+-- 创建复合索引
+CREATE INDEX idx_a_b_c ON table(a, b, c);
+
+-- ✅ 使用索引
+WHERE a = 1;
+WHERE a = 1 AND b = 2;
+WHERE a = 1 AND b = 2 AND c = 3;
+
+-- ❌ 不使用索引
+WHERE b = 2;
+WHERE c = 3;
+WHERE b = 2 AND c = 3;
+```
+
+## 查询优化
+
+### 优化 SELECT 语句
+
+```sql
+-- ❌ 坏例子：SELECT *
+SELECT * FROM users;
+
+-- ✅ 好例子：只查询需要的字段
+SELECT id, name, email FROM users;
+
+-- ❌ 坏例子：子查询
+SELECT * FROM orders WHERE user_id IN (
+  SELECT id FROM users WHERE age > 18
+);
+
+-- ✅ 好例子：JOIN
+SELECT orders.* 
+FROM orders
+JOIN users ON orders.user_id = users.id
+WHERE users.age > 18;
+```
+
+### 分页优化
+
+```sql
+-- ❌ 坏例子：大数据量分页慢
+SELECT * FROM users ORDER BY id LIMIT 1000000, 20;
+
+-- ✅ 好例子：使用游标分页
+SELECT * FROM users WHERE id > 1000000 ORDER BY id LIMIT 20;
+
+-- 或使用覆盖索引
+CREATE INDEX idx_id_name ON users(id, name);
+SELECT id, name FROM users ORDER BY id LIMIT 1000000, 20;
+```
+
+### JOIN 优化
+
+```sql
+-- 确保 JOIN 字段有索引
+CREATE INDEX idx_user_id ON orders(user_id);
+
+-- 小表驱动大表
+-- ✅ 好例子：orders 是大表，users 是小表
+SELECT * FROM users
+JOIN orders ON users.id = orders.user_id;
+
+-- 避免 JOIN 过多表（建议不超过 5 个）
+```
+
+## 数据库范式
+
+### 第一范式（1NF）
+
+```sql
+-- ❌ 违反 1NF：字段包含多个值
+CREATE TABLE users (
+  id INT,
+  name VARCHAR(50),
+  phones VARCHAR(200) -- '123456,789012'
+);
+
+-- ✅ 符合 1NF
+CREATE TABLE users (
+  id INT PRIMARY KEY,
+  name VARCHAR(50)
+);
+
+CREATE TABLE user_phones (
+  user_id INT,
+  phone VARCHAR(20),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+```
+
+### 第二范式（2NF）
+
+```sql
+-- ❌ 违反 2NF：部分依赖
+CREATE TABLE order_items (
+  order_id INT,
+  product_id INT,
+  product_name VARCHAR(100), -- 只依赖 product_id
+  quantity INT,
+  PRIMARY KEY (order_id, product_id)
+);
+
+-- ✅ 符合 2NF
+CREATE TABLE products (
+  id INT PRIMARY KEY,
+  name VARCHAR(100)
+);
+
+CREATE TABLE order_items (
+  order_id INT,
+  product_id INT,
+  quantity INT,
+  PRIMARY KEY (order_id, product_id),
+  FOREIGN KEY (product_id) REFERENCES products(id)
+);
+```
+
+### 第三范式（3NF）
+
+```sql
+-- ❌ 违反 3NF：传递依赖
+CREATE TABLE users (
+  id INT PRIMARY KEY,
+  name VARCHAR(50),
+  city VARCHAR(50),
+  province VARCHAR(50) -- 依赖 city，city 依赖 id
+);
+
+-- ✅ 符合 3NF
+CREATE TABLE cities (
+  id INT PRIMARY KEY,
+  name VARCHAR(50),
+  province VARCHAR(50)
+);
+
+CREATE TABLE users (
+  id INT PRIMARY KEY,
+  name VARCHAR(50),
+  city_id INT,
+  FOREIGN KEY (city_id) REFERENCES cities(id)
+);
+```
+
+## NoSQL 数据库选择
+
+### 关系型 vs NoSQL
+
+| 特性 | MySQL/PostgreSQL | MongoDB | Redis | Elasticsearch |
+|------|------------------|---------|-------|---------------|
+| 数据模型 | 表、行、列 | 文档（JSON） | 键值对 | 文档（JSON） |
+| 查询语言 | SQL | MongoDB Query | 命令 | DSL（JSON） |
+| 事务 | 强一致性 | 最终一致性 | 单操作原子性 | 最终一致性 |
+| 适用场景 | 结构化数据、复杂查询 | 非结构化数据、快速迭代 | 缓存、会话 | 搜索、日志分析 |
+
+### MongoDB 优化
+
+```javascript
+// 创建索引
+db.users.createIndex({ email: 1 }, { unique: true })
+db.users.createIndex({ name: 1, age: -1 })
+
+// 使用投影（只返回需要的字段）
+db.users.find(
+  { age: { $gt: 18 } },
+  { name: 1, email: 1, _id: 0 }
+)
+
+// 分页
+db.users.find().skip(10000).limit(20) // 慢
+db.users.find({ _id: { $gt: lastId } }).limit(20) // 快
+```
+
+### Redis 优化
+
+```javascript
+// 使用 Pipeline 批量操作
+const pipeline = redis.pipeline()
+pipeline.set('key1', 'value1')
+pipeline.set('key2', 'value2')
+pipeline.get('key1')
+pipeline.exec((err, results) => {
+  console.log(results) // ['OK', 'OK', 'value1']
+})
+
+// 使用 Hash 节省内存
+// ❌ 坏例子：每个字段一个 key
+redis.set('user:1:name', 'John')
+redis.set('user:1:email', 'john@example.com')
+
+// ✅ 好例子：使用 Hash
+redis.hset('user:1', 'name', 'John', 'email', 'john@example.com')
+```
+
+## 高并发优化
+
+### 数据库连接池
+
+```javascript
+// Node.js + mysql2
+const pool = mysql.createPool({
+  host: 'localhost',
+  user: 'root',
+  password: 'password',
+  database: 'mydb',
+  connectionLimit: 10, // 连接池大小
+  queueLimit: 0,
+  acquireTimeout: 10000, // 获取连接超时时间
+  timeout: 30000 // 查询超时时间
+})
+```
+
+### 读写分离
+
+```javascript
+// 主库（写）+ 从库（读）
+const masterPool = mysql.createPool({
+  host: 'master-host',
+  // ...
+})
+
+const slavePool = mysql.createPool({
+  host: 'slave-host',
+  // ...
+})
+
+// 写操作使用主库
+async function createUser(user) {
+  const [result] = await masterPool.execute(
+    'INSERT INTO users (name, email) VALUES (?, ?)',
+    [user.name, user.email]
+  )
+  return result.insertId
+}
+
+// 读操作使用从库
+async function getUsers() {
+  const [rows] = await slavePool.execute('SELECT * FROM users')
+  return rows
+}
+```
+
+### 缓存策略
+
+```javascript
+// 使用 Redis 缓存热点数据
+async function getUser(id) {
+  // 先查缓存
+  const cached = await redis.get(`user:${id}`)
+  if (cached) {
+    return JSON.parse(cached)
+  }
+  
+  // 缓存未命中，查数据库
+  const [rows] = await db.execute('SELECT * FROM users WHERE id = ?', [id])
+  const user = rows[0]
+  
+  // 写入缓存（过期时间 1 小时）
+  await redis.setex(`user:${id}`, 3600, JSON.stringify(user))
+  
+  return user
+}
+```
+
+## 实战：电商数据库设计
+
+```sql
+-- 用户表
+CREATE TABLE users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(50) UNIQUE NOT NULL,
+  email VARCHAR(100) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_email (email)
+);
+
+-- 商品表
+CREATE TABLE products (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  name VARCHAR(200) NOT NULL,
+  description TEXT,
+  price DECIMAL(10, 2) NOT NULL,
+  stock INT NOT NULL DEFAULT 0,
+  category_id INT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_category (category_id),
+  INDEX idx_price (price)
+);
+
+-- 订单表
+CREATE TABLE orders (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  total_amount DECIMAL(10, 2) NOT NULL,
+  status ENUM('pending', 'paid', 'shipped', 'completed', 'cancelled') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_user (user_id),
+  INDEX idx_status (status)
+);
+
+-- 订单详情表
+CREATE TABLE order_items (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  order_id INT NOT NULL,
+  product_id INT NOT NULL,
+  quantity INT NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  FOREIGN KEY (order_id) REFERENCES orders(id),
+  FOREIGN KEY (product_id) REFERENCES products(id),
+  INDEX idx_order (order_id)
+);
+```
+
+## 小结
+
+✅ **已完成：**
+- 学会了使用 EXPLAIN 分析查询
+- 掌握了索引的创建和优化
+- 理解了数据库范式（1NF、2NF、3NF）
+- 学会了查询优化技巧
+- 了解了 NoSQL 数据库的选择
+- 掌握了高并发场景下的优化策略
+
+🚀 **下一步：**
+- 学习数据库分库分表
+- 掌握数据库中间件（MyCat、ShardingSphere）
+- 学习数据库高可用（主从复制、哨兵模式）
+- 了解 NewSQL（TiDB、CockroachDB）
+
+💡 **提示：** 数据库优化是一个持续的过程，定期分析慢查询日志，不断优化索引和查询！

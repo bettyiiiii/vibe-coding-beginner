@@ -1,0 +1,306 @@
+---
+title: "后端开发入门"
+chapter: "08"
+description: "Node.js/Python 服务端技术栈、API 设计、数据库设计与优化"
+---
+
+# 后端开发入门
+
+> 后端是产品的"大脑"，处理业务逻辑、数据存储和 API 服务。
+
+## 后端基础概念
+
+### 什么是后端？
+
+后端 (Backend) 是运行在服务器上的程序，负责：
+- **业务逻辑处理**
+- **数据库操作**
+- **API 接口提供**
+- **用户认证与授权**
+- **安全防护**
+
+### 前端 vs 后端
+
+| 维度 | 前端 | 后端 |
+|------|------|--------|
+| 运行位置 | 浏览器 | 服务器 |
+| 用户可见 | ✅ 可见 | ❌ 不可见 |
+| 主要任务 | UI 交互 | 数据处理 |
+| 技术栈 | HTML/CSS/JS, React | Node.js, Python, Java |
+| 数据库 | ❌ 不直接操作 | ✅ 直接操作 |
+
+## Node.js 基础
+
+### 什么是 Node.js？
+
+Node.js 是一个基于 Chrome V8 引擎的 JavaScript 运行环境，让 JavaScript 可以运行在服务器上。
+
+### 第一个 Node.js 程序
+
+```javascript
+// app.js
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/plain');
+  res.end('Hello, Vibe Coding!\n');
+});
+
+server.listen(3000, () => {
+  console.log('服务器运行在 http://localhost:3000/');
+});
+```
+
+运行：
+```bash
+node app.js
+# 访问 http://localhost:3000
+```
+
+### Express 框架
+
+Express 是 Node.js 最流行的 Web 框架。
+
+```javascript
+// 安装：npm install express
+const express = require('express');
+const app = express();
+
+// 中间件
+app.use(express.json());
+
+// 路由
+app.get('/', (req, res) => {
+  res.send('Hello World!');
+});
+
+app.post('/api/users', (req, res) => {
+  const user = req.body;
+  // 保存用户...
+  res.json({ message: '用户创建成功', user });
+});
+
+// 启动服务器
+app.listen(3000, () => {
+  console.log('服务器运行在端口 3000');
+});
+```
+
+## Python 后端开发
+
+### Flask 框架（轻量级）
+
+```python
+# 安装：pip install flask
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+@app.route('/')
+def hello():
+    return 'Hello, Vibe Coding!'
+
+@app.route('/api/users', methods=['POST'])
+def create_user():
+    data = request.get_json()
+    # 处理用户创建...
+    return jsonify({'message': '用户创建成功', 'data': data})
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
+```
+
+### Django 框架（全功能）
+
+```python
+# views.py
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+def create_user(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        # 处理用户创建...
+        return JsonResponse({'message': '用户创建成功', 'data': data})
+```
+
+## API 设计
+
+### RESTful API 设计原则
+
+| HTTP 方法 | 操作 | 示例 |
+|-----------|------|------|
+| GET | 获取资源 | `GET /api/users/1` |
+| POST | 创建资源 | `POST /api/users` |
+| PUT | 更新资源 | `PUT /api/users/1` |
+| DELETE | 删除资源 | `DELETE /api/users/1` |
+
+### API 响应格式
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "张三",
+    "email": "zhangsan@example.com"
+  },
+  "message": "操作成功",
+  "code": 200
+}
+```
+
+### 错误处理
+
+```javascript
+// Express 错误处理中间件
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  
+  const statusCode = err.statusCode || 500;
+  const message = err.message || '服务器内部错误';
+  
+  res.status(statusCode).json({
+    success: false,
+    message: message,
+    code: statusCode
+  });
+});
+```
+
+## 数据库设计与优化
+
+### 关系型数据库 (MySQL/PostgreSQL)
+
+```sql
+-- 用户表
+CREATE TABLE users (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  username VARCHAR(50) NOT NULL UNIQUE,
+  email VARCHAR(100) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 文章表
+CREATE TABLE posts (
+  id INT PRIMARY KEY AUTO_INCREMENT,
+  user_id INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  content TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 索引优化
+CREATE INDEX idx_user_email ON users(email);
+CREATE INDEX idx_post_user ON posts(user_id);
+```
+
+### NoSQL 数据库 (MongoDB)
+
+```javascript
+// Mongoose Schema 定义
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model('User', userSchema);
+```
+
+### 数据库优化技巧
+
+1. **索引优化**: 为常用查询字段创建索引
+2. **查询优化**: 只查询需要的字段
+3. **连接池**: 使用数据库连接池
+4. **缓存策略**: 使用 Redis 缓存热点数据
+5. **分库分表**: 大数据量时考虑分片
+
+## 用户认证与授权
+
+### JWT (JSON Web Token) 认证
+
+```javascript
+const jwt = require('jsonwebtoken');
+
+// 生成 Token
+function generateToken(userId) {
+  return jwt.sign(
+    { userId: userId },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+}
+
+// 验证 Token 中间件
+function authMiddleware(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ message: '未提供认证令牌' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.userId = decoded.userId;
+    next();
+  } catch (error) {
+    return res.status(401).json({ message: '无效的认证令牌' });
+  }
+}
+```
+
+## 项目实战：博客 API
+
+### 需求分析
+
+- 用户注册/登录
+- 创建/编辑/删除文章
+- 文章列表与详情
+- 评论功能
+
+### 技术选型
+
+- **框架**: Express.js
+- **数据库**: MongoDB (Mongoose)
+- **认证**: JWT
+- **密码加密**: bcrypt
+
+### 核心代码
+
+```javascript
+// models/Post.js
+const postSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+  author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+// routes/posts.js
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    const post = new Post({
+      title: req.body.title,
+      content: req.body.content,
+      author: req.userId
+    });
+    await post.save();
+    res.status(201).json({ success: true, data: post });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+```
+
+## 下一步
+
+- 学习 [第09章：全栈项目实战]()
+- 实战 [部署后端服务到云服务器]()
+- 进阶 [微服务架构设计]()

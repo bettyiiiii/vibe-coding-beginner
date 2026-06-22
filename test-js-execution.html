@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>测试页面 - Vibe Coding</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 60px 40px;
+      max-width: 800px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    h1 { color: #333; margin-bottom: 20px; font-size: 2.5rem; }
+    .status { 
+      padding: 20px;
+      border-radius: 10px;
+      margin: 20px 0;
+      font-size: 1.1rem;
+    }
+    .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .test-section { margin: 30px 0; }
+    .test-section h2 { color: #555; margin-bottom: 15px; font-size: 1.5rem; }
+    button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+      margin: 5px;
+      transition: all 0.3s;
+    }
+    button:hover { background: #764ba2; transform: translateY(-2px); }
+    #console-output {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 15px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 20px;
+    }
+    .log-entry { margin: 2px 0; }
+    .log-entry::before { content: "> "; color: #667eea; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🧪 JavaScript 执行测试</h1>
+    
+    <div class="status success">
+      ✅ 如果你能看到这个绿色框，说明 HTML 和 CSS 正常加载！
+    </div>
+
+    <div class="test-section">
+      <h2>测试 1: 基本 JavaScript 执行</h2>
+      <div class="status info" id="test1-result">等待测试...</div>
+    </div>
+
+    <div class="test-section">
+      <h2>测试 2: 按钮交互</h2>
+      <button onclick="testButtonClick()">点击我测试</button>
+      <div class="status info" id="test2-result">等待测试...</div>
+    </div>
+
+    <div class="test-section">
+      <h2>测试 3: Fetch API 测试</h2>
+      <button onclick="testFetch()">测试 Fetch API</button>
+      <div class="status info" id="test3-result">等待测试...</div>
+    </div>
+
+    <div class="test-section">
+      <h2>测试 4: 控制台输出</h2>
+      <button onclick="testConsole()">测试控制台</button>
+      <div id="console-output"></div>
+    </div>
+
+    <div class="test-section">
+      <h2>📊 测试结果汇总</h2>
+      <div id="summary"></div>
+    </div>
+  </div>
+
+  <script>
+    // 测试结果统计
+    let testResults = {
+      test1: false,
+      test2: false,
+      test3: false,
+      test4: false
+    };
+
+    // 测试 1: 基本 JavaScript 执行
+    try {
+      document.getElementById('test1-result').className = 'status success';
+      document.getElementById('test1-result').innerHTML = '✅ JavaScript 执行成功！当前时间: ' + new Date().toLocaleString('zh-CN');
+      testResults.test1 = true;
+      updateSummary();
+    } catch (e) {
+      document.getElementById('test1-result').className = 'status error';
+      document.getElementById('test1-result').innerHTML = '❌ JavaScript 执行失败: ' + e.message;
+    }
+
+    // 测试 2: 按钮交互
+    function testButtonClick() {
+      try {
+        document.getElementById('test2-result').className = 'status success';
+        document.getElementById('test2-result').innerHTML = '✅ 按钮点击事件正常！点击时间: ' + new Date().toLocaleString('zh-CN');
+        testResults.test2 = true;
+        updateSummary();
+      } catch (e) {
+        document.getElementById('test2-result').className = 'status error';
+        document.getElementById('test2-result').innerHTML = '❌ 按钮点击事件失败: ' + e.message;
+      }
+    }
+
+    // 测试 3: Fetch API
+    async function testFetch() {
+      try {
+        document.getElementById('test3-result').className = 'status info';
+        document.getElementById('test3-result').innerHTML = '⏳ 正在测试 Fetch API...';
+        
+        const response = await fetch('http://localhost:5173/');
+        if (response.ok) {
+          document.getElementById('test3-result').className = 'status success';
+          document.getElementById('test3-result').innerHTML = '✅ Fetch API 成功！状态码: ' + response.status;
+          testResults.test3 = true;
+        } else {
+          throw new Error('状态码: ' + response.status);
+        }
+        updateSummary();
+      } catch (e) {
+        document.getElementById('test3-result').className = 'status error';
+        document.getElementById('test3-result').innerHTML = '❌ Fetch API 失败: ' + e.message + '<br>注意：可能是 CORS 问题或服务器未启动';
+      }
+    }
+
+    // 测试 4: 控制台输出
+    function testConsole() {
+      try {
+        const output = document.getElementById('console-output');
+        output.innerHTML = '';
+        
+        function log(message) {
+          const entry = document.createElement('div');
+          entry.className = 'log-entry';
+          entry.textContent = message;
+          output.appendChild(entry);
+        }
+        
+        log('控制台测试开始...');
+        console.log('测试日志 1: 基本日志');
+        log('✅ console.log 执行成功');
+        
+        console.warn('测试警告: 这是一个警告');
+        log('⚠️ console.warn 执行成功');
+        
+        console.error('测试错误: 这是一个错误');
+        log('❌ console.error 执行成功');
+        
+        log('✅ 所有控制台测试完成！请按 F12 查看控制台输出');
+        testResults.test4 = true;
+        updateSummary();
+      } catch (e) {
+        document.getElementById('test3-result').className = 'status error';
+        document.getElementById('test3-result').innerHTML = '❌ 控制台测试失败: ' + e.message;
+      }
+    }
+
+    // 更新测试结果汇总
+    function updateSummary() {
+      const summary = document.getElementById('summary');
+      const passed = Object.values(testResults).filter(r => r).length;
+      const total = Object.keys(testResults).length;
+      
+      let html = `<div class="status ${passed === total ? 'success' : 'info'}">`;
+      html += `<strong>测试结果: ${passed} / ${total} 通过</strong><br>`;
+      
+      for (const [test, result] of Object.entries(testResults)) {
+        html += `测试 ${test.replace('test', '')}: ${result ? '✅' : '❌'}<br>`;
+      }
+      
+      html += `</div>`;
+      summary.innerHTML = html;
+    }
+
+    // 页面加载完成后执行
+    window.addEventListener('DOMContentLoaded', () => {
+      console.log('✅ DOMContentLoaded 事件触发');
+      updateSummary();
+    });
+
+    window.addEventListener('load', () => {
+      console.log('✅ Window Load 事件触发');
+    });
+
+    console.log('✅ 脚本加载完成');
+  </script>
+</body>
+</html>

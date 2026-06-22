@@ -1,0 +1,472 @@
+---
+title: "微服务架构"
+chapter: "16"
+description: "学习微服务设计原则、服务拆分、API 网关、服务发现、配置管理，掌握分布式系统设计"
+---
+
+# 微服务架构
+
+> 微服务不是银弹，但是应对复杂系统的有效架构模式。
+
+## 什么是微服务？
+
+### 单体应用 vs 微服务
+
+**单体应用（Monolith）**：
+```
+┌─────────────────────────────┐
+│   电商应用（单体）          │
+│   ├── 用户模块             │
+│   ├── 商品模块             │
+│   ├── 订单模块             │
+│   ├── 支付模块             │
+│   └── 物流模块             │
+│                            │
+│   所有模块打包在一个应用中   │
+└─────────────────────────────┘
+```
+
+**微服务（Microservices）**：
+```
+┌────────────┐   ┌────────────┐   ┌────────────┐
+│ 用户服务   │   │ 商品服务   │   │ 订单服务   │
+└────────────┘   └────────────┘   └────────────┘
+       │                │                 │
+       └────────────────┼─────────────────┘
+                        │
+                 ┌──────▼──────┐
+                 │  API 网关    │
+                 └──────┬──────┘
+                        │
+                 ┌──────▼──────┐
+                 │   客户端     │
+                 └─────────────┘
+```
+
+### 微服务的优缺点
+
+| 优点 | 缺点 |
+|------|------|
+| 独立部署 | 分布式系统复杂 |
+| 技术栈灵活 | 服务间通信开销 |
+| 易于扩展 | 数据一致性挑战 |
+| 故障隔离 | 运维复杂度高 |
+| 团队自治 | 测试困难 |
+
+## 微服务设计原则
+
+### 1. 单一职责原则
+
+```
+❌ 坏例子：一个服务做太多事情
+┌─────────────────────────┐
+│   用户服务              │
+│   ├── 用户注册/登录    │
+│   ├── 用户资料管理     │
+│   ├── 用户权限管理     │
+│   └── 用户积分管理     │
+└─────────────────────────┘
+
+✅ 好例子：拆分为独立服务
+┌────────────┐  ┌────────────┐  ┌────────────┐
+│ 认证服务   │  │ 用户服务   │  │ 积分服务   │
+└────────────┘  └────────────┘  └────────────┘
+```
+
+### 2. 服务自治
+
+每个微服务应该：
+- 拥有自己的数据库
+- 独立部署
+- 独立扩展
+- 独立开发
+
+### 3. 服务通信
+
+| 通信方式 | 适用场景 | 例子 |
+|----------|----------|------|
+| HTTP/REST | 同步调用 | 查询用户信息 |
+| gRPC | 高性能内部调用 | 服务间通信 |
+| 消息队列 | 异步处理 | 订单创建后发送邮件 |
+| 事件驱动 | 解耦 | 用户注册后发送欢迎邮件 |
+
+## 服务拆分策略
+
+### 按业务领域拆分（DDD）
+
+```
+电商系统领域划分：
+
+┌─────────────────────────────────────────────┐
+│ 用户域           │
+│ ├── 用户注册      │
+│ ├── 用户认证      │
+│ └── 用户资料      │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│ 商品域           │
+│ ├── 商品管理      │
+│ ├── 商品搜索      │
+│ └── 商品分类      │
+└─────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────┐
+│ 订单域           │
+│ ├── 订单创建      │
+│ ├── 订单查询      │
+│ └── 订单取消      │
+└─────────────────────────────────────────────┘
+```
+
+### 拆分示例
+
+```javascript
+// ❌ 坏例子：单体式
+// app.js
+const express = require('express')
+const app = express()
+
+// 用户相关路由
+app.post('/users/register', (req, res) => { /* ... */ })
+app.post('/users/login', (req, res) => { /* ... */ })
+
+// 商品相关路由
+app.get('/products', (req, res) => { /* ... */ })
+app.post('/products', (req, res) => { /* ... */ })
+
+// 订单相关路由
+app.post('/orders', (req, res) => { /* ... */ })
+app.get('/orders/:id', (req, res) => { /* ... */ })
+
+app.listen(3000)
+```
+
+```javascript
+// ✅ 好例子：微服务
+// user-service.js
+const express = require('express')
+const app = express()
+
+app.post('/register', (req, res) => { /* ... */ })
+app.post('/login', (req, res) => { /* ... */ })
+app.get('/:id', (req, res) => { /* ... */ })
+
+app.listen(3001)
+
+// product-service.js
+const express = require('express')
+const app = express()
+
+app.get('/', (req, res) => { /* ... */ })
+app.post('/', (req, res) => { /* ... */ })
+
+app.listen(3002)
+
+// order-service.js
+const express = require('express')
+const app = express()
+
+app.post('/', (req, res) => { /* ... */ })
+app.get('/:id', (req, res) => { /* ... */ })
+
+app.listen(3003)
+```
+
+## API 网关
+
+### 为什么需要 API 网关？
+
+```
+没有 API 网关（❌）：
+客户端 → 用户服务 (3001)
+客户端 → 商品服务 (3002)
+客户端 → 订单服务 (3003)
+客户端 → 支付服务 (3004)
+# 问题：
+# 1. 客户端需要知道所有服务的地址
+# 2. 跨域问题
+# 3. 认证需要在每个服务实现
+# 4. 客户端请求次数多
+```
+
+```
+有 API 网关（✅）：
+客户端 → API 网关 (3000) → 用户服务 (3001)
+                               → 商品服务 (3002)
+                               → 订单服务 (3003)
+# 好处：
+# 1. 客户端只需要知道网关地址
+# 2. 统一处理跨域
+# 3. 统一认证
+# 4. 请求聚合
+```
+
+### 使用 Express 实现简单 API 网关
+
+```javascript
+const express = require('express')
+const { createProxyMiddleware } = require('http-proxy-middleware')
+const app = express()
+
+// 认证中间件
+function authenticate(req, res, next) {
+  const token = req.headers.authorization
+  
+  if (!token) {
+    return res.status(401).json({ message: '未授权' })
+  }
+  
+  // 验证 token（省略）
+  next()
+}
+
+// 用户服务代理
+app.use('/users', authenticate, createProxyMiddleware({
+  target: 'http://localhost:3001',
+  changeOrigin: true
+}))
+
+// 商品服务代理
+app.use('/products', createProxyMiddleware({
+  target: 'http://localhost:3002',
+  changeOrigin: true
+}))
+
+// 订单服务代理（需要认证）
+app.use('/orders', authenticate, createProxyMiddleware({
+  target: 'http://localhost:3003',
+  changeOrigin: true
+}))
+
+// 请求聚合
+app.get('/dashboard', authenticate, async (req, res) => {
+  const userId = req.user.id
+  
+  // 并行请求多个服务
+  const [user, orders] = await Promise.all([
+    fetch('http://localhost:3001/' + userId).then(r => r.json()),
+    fetch('http://localhost:3003?user=' + userId).then(r => r.json())
+  ])
+  
+  res.json({ user, orders })
+})
+
+app.listen(3000)
+```
+
+## 服务发现
+
+### 为什么需要服务发现？
+
+```
+❌ 硬编码服务地址（坏例子）：
+const userServiceUrl = 'http://localhost:3001'
+const productServiceUrl = 'http://localhost:3002'
+
+# 问题：
+# 1. 服务地址变化需要修改代码
+# 2. 无法动态扩展（增加服务实例）
+# 3. 单点故障
+```
+
+```
+✅ 使用服务发现（好例子）：
+服务 A ──→ 服务发现 ──→ 服务 B (3001)
+                     └──→ 服务 B (3002)
+                     └──→ 服务 B (3003)
+
+# 好处：
+# 1. 动态发现服务地址
+# 2. 支持水平扩展
+# 3. 健康检查
+```
+
+### 使用 Consul 实现服务发现
+
+```javascript
+// 服务注册（每个微服务启动时注册自己）
+const consul = require('consul')({ host: 'localhost' })
+
+const serviceId = 'user-service-' + Math.random().toString(36).substr(2, 9)
+
+// 注册服务
+consul.agent.service.register({
+  id: serviceId,
+  name: 'user-service',
+  address: 'localhost',
+  port: 3001,
+  check: {
+    http: 'http://localhost:3001/health',
+    interval: '10s'
+  }
+}, (err) => {
+  if (err) throw err
+  console.log('服务注册成功:', serviceId)
+})
+
+// 服务发现（调用其他服务时）
+async function getUserService() {
+  const services = await new Promise((resolve, reject) => {
+    consul.health.service('user-service', (err, result) => {
+      if (err) reject(err)
+      else resolve(result)
+    })
+  })
+  
+  // 简单负载均衡（轮询）
+  const service = services[Math.floor(Math.random() * services.length)]
+  const address = service.Service.Address
+  const port = service.Service.Port
+  
+  return `http://${address}:${port}`
+}
+```
+
+## 配置管理
+
+### 配置中心
+
+```
+❌ 配置分散（坏例子）：
+用户服务 → config.json {"db_host": "localhost", "db_port": 3306}
+订单服务 → config.json {"db_host": "localhost", "db_port": 3306}
+# 问题：配置重复，修改麻烦
+```
+
+```
+✅ 配置中心（好例子）：
+配置中心 ───→ 用户服务
+          └──→ 订单服务
+          └──→ 商品服务
+# 好处：集中管理，动态更新
+```
+
+### 使用 etcd 作为配置中心
+
+```javascript
+const etcd = require('etcd3')
+const client = new etcd.Etcd3({ hosts: 'http://localhost:2379' })
+
+// 写入配置
+async function setConfig() {
+  await client.put('config/db/host').value('localhost')
+  await client.put('config/db/port').value('3306')
+}
+
+// 读取配置
+async function getConfig() {
+  const host = await client.get('config/db/host').string()
+  const port = await client.get('config/db/port').string()
+  
+  return { host, port }
+}
+
+// 监听配置变化
+client.watch()
+  .key('config/db/host')
+  .create(async (event) => {
+    console.log('配置已更新:', await event.value())
+  })
+```
+
+## 分布式追踪
+
+### 为什么需要分布式追踪？
+
+```
+一个请求可能涉及多个服务：
+客户端 → API 网关 → 订单服务 → 用户服务
+                             → 商品服务
+                             → 支付服务
+
+问题：如何追踪一个请求在多个服务中的调用链？
+```
+
+### 使用 OpenTelemetry 实现分布式追踪
+
+```javascript
+const { NodeTracerProvider } = require('@opentelemetry/sdk-trace-node')
+const { SimpleSpanProcessor } = require('@opentelemetry/sdk-trace-base')
+const { JaegerExporter } = require('@opentelemetry/exporter-jaeger')
+const { registerInstrumentations } = require('@opentelemetry/instrumentation')
+const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http')
+
+// 创建 Tracer Provider
+const provider = new NodeTracerProvider()
+
+// 配置 Jaeger Exporter
+const exporter = new JaegerExporter({
+  endpoint: 'http://localhost:14268/api/traces'
+})
+
+provider.addSpanProcessor(new SimpleSpanProcessor(exporter))
+provider.register()
+
+// 自动埋点
+registerInstrumentations({
+  instrumentations: [
+    new HttpInstrumentation()
+  ]
+})
+
+// 手动埋点
+const { trace } = require('@opentelemetry/api')
+const tracer = trace.getTracer('my-service')
+
+app.get('/orders', (req, res) => {
+  const span = tracer.startSpan('get-orders')
+  
+  // 业务逻辑
+  const orders = await Order.findall()
+  
+  span.end()
+  res.json(orders)
+})
+```
+
+## 实战：电商微服务架构
+
+```
+┌─────────────┐
+│                       电商系统                         │
+├─────────────┤
+│               │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐  │
+│  │ 用户服务  │    │ 商品服务  │    │ 订单服务  │  │
+│  │ (3001)   │    │ (3002)   │    │ (3003)   │  │
+│  └──────────┘    └──────────┘    └──────────┘  │
+│               │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐  │
+│  │ 支付服务  │    │ 物流服务  │    │ 通知服务  │  │
+│  │ (3004)   │    │ (3005)   │    │ (3006)   │  │
+│  └──────────┘    └──────────┘    └──────────┘  │
+│               │
+│  ┌──────────────────────────────────────────┐    │
+│  │         API 网关 (3000)                  │    │
+│  └──────────────────────────────────────────┘    │
+│               │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐  │
+│  │ 服务发现  │    │ 配置中心  │    │ 分布式追踪│  │
+│  │ (Consul) │    │ (etcd)   │    │ (Jaeger) │  │
+│  └──────────┘    └──────────┘    └──────────┘  │
+│               │
+└─────────────┘
+```
+
+## 小结
+
+✅ **已完成：**
+- 理解了微服务的概念和优缺点
+- 学会了微服务设计原则
+- 掌握了服务拆分策略
+- 学会了 API 网关的实现
+- 了解了服务发现、配置管理、分布式追踪
+
+🚀 **下一步：**
+- 学习 WebSocket 实时通信
+- 掌握 GraphQL API 开发
+- 学习 Serverless 无服务器架构
+- 了解监控与日志
+
+💡 **提示：** 微服务不是银弹，只有在系统复杂度达到一定规模时才考虑使用！

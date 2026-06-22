@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vibe Coding 测试页</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      max-width: 600px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+    }
+    h1 { color: #333; margin-bottom: 16px; font-size: 28px; }
+    p { color: #666; line-height: 1.6; margin-bottom: 12px; font-size: 16px; }
+    .success { 
+      background: #d4edda; 
+      color: #155724; 
+      padding: 12px 20px; 
+      border-radius: 8px; 
+      margin: 20px 0;
+      font-weight: bold;
+    }
+    .info { 
+      background: #e7f3ff; 
+      padding: 16px; 
+      border-radius: 8px; 
+      margin-top: 20px;
+      text-align: left;
+    }
+    .info h3 { color: #0066cc; margin-bottom: 8px; }
+    .info li { margin: 6px 0; color: #333; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🎉 页面加载成功！</h1>
+    <div class="success">✅ 如果你看到这个页面，说明浏览器和开发服务器都正常工作</div>
+    
+    <p>这是纯 HTML + CSS 静态页面，不依赖任何 JavaScript 框架。</p>
+    <p>如果你能看到这里，说明 <code>localhost:5173</code> 的开发服务器运行正常。</p>
+    
+    <div class="info">
+      <h3>📋 下一步排查</h3>
+      <ul>
+        <li>✅ 开发服务器正常</li>
+        <li>✅ 浏览器能正常加载 HTML</li>
+        <li>❓ React JS 可能没有正确执行</li>
+        <li>💡 我们先用这个静态页确认基础环境</li>
+      </ul>
+    </div>
+
+    <div style="margin-top: 30px;">
+      <a href="http://localhost:5173/" style="display: inline-block; background: #667eea; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; margin: 8px;">返回首页</a>
+      <button onclick="alert('JavaScript 执行正常！')" style="background: #764ba2; color: white; padding: 12px 24px; border-radius: 8px; border: none; cursor: pointer; margin: 8px;">测试 JS</button>
+    </div>
+  </div>
+</body>
+</html>

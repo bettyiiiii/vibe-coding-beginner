@@ -1,0 +1,302 @@
+---
+title: "前端开发基础"
+chapter: "07"
+description: "HTML/CSS/JavaScript 基础，React/Vue 框架实战，性能优化，工程化实践"
+---
+
+# 前端开发基础
+
+> 前端是用户看到的界面，是产品的"脸面"。
+
+## 前端三件套
+
+### HTML - 网页的骨架
+
+HTML (HyperText Markup Language) 定义了网页的结构。
+
+```html
+<!-- 基础页面结构 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>我的第一个网页</title>
+</head>
+<body>
+  <h1>欢迎来到 Vibe Coding</h1>
+  <p>这是一个段落</p>
+</body>
+</html>
+```
+
+**核心概念：**
+- **标签 (Tag)**: `<h1>`, `<p>`, `<div>` 等
+- **属性 (Attribute)**: `<a href="...">`, `<img src="...">`
+- **语义化**: 使用正确的标签表达正确的含义
+
+### CSS - 网页的样式
+
+CSS (Cascading Style Sheets) 控制网页的外观。
+
+```css
+/* 选择器 { 属性: 值; } */
+h1 {
+  color: #333;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+```
+
+**核心概念：**
+- **选择器**: 选中要样式化的元素
+- **盒模型**: content → padding → border → margin
+- **Flexbox/Grid**: 现代布局方案
+- **响应式**: 使用媒体查询适配不同屏幕
+
+### JavaScript - 网页的行为
+
+JavaScript 让网页"活"起来。
+
+```javascript
+// 变量
+const message = "Hello, World!";
+
+// 函数
+function greet(name) {
+  return `Hello, ${name}!`;
+}
+
+// DOM 操作
+document.querySelector('h1').textContent = greet('Vibe Coding');
+```
+
+**核心概念：**
+- **变量与数据类型**
+- **函数与作用域**
+- **DOM 操作**
+- **事件处理**
+- **异步编程 (Promise/async/await)**
+
+## 现代前端框架
+
+### React - 组件化开发
+
+```jsx
+import React, { useState } from 'react';
+
+function Counter() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div>
+      <p>当前计数: {count}</p>
+      <button onClick={() => setCount(count + 1)}>
+        增加
+      </button>
+    </div>
+  );
+}
+```
+
+**核心概念：**
+- **组件**: 可复用的 UI 单元
+- **JSX**: JavaScript + XML 的语法扩展
+- **状态 (State)**: 组件的数据
+- **属性 (Props)**: 组件间传递数据
+- **Hooks**: useState, useEffect 等
+
+### Vue - 渐进式框架
+
+```vue
+<template>
+  <div>
+    <p>当前计数: {{ count }}</p>
+    <button @click="increment">增加</button>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      count: 0
+    };
+  },
+  methods: {
+    increment() {
+      this.count++;
+    }
+  }
+};
+</script>
+```
+
+## 性能优化
+
+### 关键指标
+
+| 指标 | 说明 | 目标 |
+|------|------|------|
+| FCP | 首次内容绘制 | < 1.8s |
+| LCP | 最大内容绘制 | < 2.5s |
+| CLS | 累积布局偏移 | < 0.1 |
+| TBT | 总阻塞时间 | < 200ms |
+
+### 优化技巧
+
+1. **代码分割**: 使用动态导入 `import()`
+2. **懒加载**: 图片、组件按需加载
+3. **缓存策略**: Service Worker, HTTP 缓存
+4. **压缩资源**: Gzip, Brotli
+5. **CDN 加速**: 静态资源分发到边缘节点
+
+## 工程化实践
+
+### 构建工具
+
+- **Vite**: 新一代前端构建工具，极速 HMR
+- **Webpack**: 功能强大的模块打包器
+- **Rollup**: 库打包首选
+- **esbuild**: 用 Go 写的超快构建工具
+
+### 代码规范
+
+```javascript
+// .eslintrc.js
+module.exports = {
+  rules: {
+    'no-console': 'warn',
+    'no-unused-vars': ['error', { vars: 'all', args: 'none' }],
+    'prefer-const': 'error',
+  },
+};
+```
+
+### Git 工作流
+
+```bash
+# 功能分支工作流
+git checkout -b feature/new-feature
+# ... 开发 ...
+git add .
+git commit -m "feat: add new feature"
+git push origin feature/new-feature
+# 创建 Pull Request
+```
+
+## 实战：创建一个响应式导航栏
+
+### 需求分析
+
+- 桌面端：水平导航
+- 移动端：汉堡菜单
+- 滚动时：导航栏样式变化
+
+### 实现代码
+
+```jsx
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+
+export default function Navbar() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 10);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
+      <div className="container">
+        <Link to="/" className="logo">Vibe Coding</Link>
+        
+        <div className={`menu ${menuOpen ? 'open' : ''}`}>
+          <Link to="/chapters">章节</Link>
+          <Link to="/about">关于</Link>
+        </div>
+        
+        <button 
+          className="hamburger"
+          onClick={() => setMenuOpen(!menuOpen)}
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+```
+
+```css
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  transition: box-shadow 0.3s;
+}
+
+.navbar.scrolled {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 64px;
+}
+
+.menu {
+  display: flex;
+  gap: 2rem;
+}
+
+.hamburger {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .menu {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    right: 0;
+    background: white;
+    flex-direction: column;
+    padding: 1rem;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    transform: translateX(-100%);
+    transition: transform 0.3s;
+  }
+  
+  .menu.open {
+    transform: translateX(0);
+  }
+  
+  .hamburger {
+    display: block;
+  }
+}
+```
+
+## 下一步
+
+- 学习 [第08章：后端开发入门]()
+- 实战 [项目：个人作品集网站]()
+- 进阶 [性能优化深度指南]()

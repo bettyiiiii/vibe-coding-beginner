@@ -1,0 +1,349 @@
+---
+title: "前端性能优化"
+chapter: "10"
+description: "核心Web指标、代码分割、懒加载、缓存策略、构建优化"
+---
+
+# 前端性能优化
+
+> 性能是用户体验的核心，1秒的延迟可能导致7%的转化损失。
+
+## 核心Web指标 (Core Web Vitals)
+
+### 三大核心指标
+
+| 指标 | 说明 | 目标值 | 测量工具 |
+|------|------|--------|----------|
+| **LCP** (最大内容绘制) | 页面主要内容加载时间 | < 2.5s | PageSpeed Insights |
+| **INP** (交互到下一次绘制) | 页面响应速度 | < 200ms | Web Vitals |
+| **CLS** (累积布局偏移) | 视觉稳定性 | < 0.1 | Lighthouse |
+
+### 测量与监控
+
+```javascript
+// 使用 web-vitals 库测量
+import { getLCP, getINP, getCLS } from 'web-vitals';
+
+getLCP(metric => {
+  console.log('LCP:', metric.value);
+  // 发送到分析服务
+  sendToAnalytics('LCP', metric.value);
+});
+
+getINP(metric => {
+  console.log('INP:', metric.value);
+  sendToAnalytics('INP', metric.value);
+});
+
+getCLS(metric => {
+  console.log('CLS:', metric.value);
+  sendToAnalytics('CLS', metric.value);
+});
+```
+
+## 加载性能优化
+
+### 代码分割 (Code Splitting)
+
+```javascript
+// React.lazy 动态导入
+import { lazy, Suspense } from 'react';
+
+const Home = lazy(() => import('./pages/Home'));
+const About = lazy(() => import('./pages/About'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+
+function App() {
+  return (
+    <Suspense fallback={<div>加载中...</div>}>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+      </Routes>
+    </Suspense>
+  );
+}
+```
+
+```javascript
+// Vite 手动分包配置
+// vite.config.js
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['antd', 'lodash'],
+          'utils': ['axios', 'dayjs']
+        }
+      }
+    }
+  }
+});
+```
+
+### 图片优化
+
+```html
+<!-- 响应式图片 -->
+<img 
+  srcset="image-320w.jpg 320w,
+           image-480w.jpg 480w,
+           image-800w.jpg 800w"
+  sizes="(max-width: 320px) 280px,
+         (max-width: 480px) 440px,
+         800px"
+  src="image-800w.jpg"
+  alt="描述文字"
+  loading="lazy"
+/>
+
+<!-- 现代格式 -->
+<picture>
+  <source srcset="image.avif" type="image/avif" />
+  <source srcset="image.webp" type="image/webp" />
+  <img src="image.jpg" alt="描述文字" />
+</picture>
+```
+
+```css
+/* 图片懒加载样式 */
+img[loading="lazy"] {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+img[loading="lazy"].loaded {
+  opacity: 1;
+}
+```
+
+### 资源预加载
+
+```html
+<!-- DNS 预解析 -->
+<link rel="dns-prefetch" href="//fonts.googleapis.com">
+
+<!-- 预连接 -->
+<link rel="preconnect" href="//api.example.com">
+
+<!-- 预加载关键资源 -->
+<link rel="preload" href="/fonts/main.woff2" as="font" type="font/woff2" crossorigin>
+
+<!-- 预获取可能需要的资源 -->
+<link rel="prefetch" href="/js/dashboard.js">
+```
+
+## 渲染性能优化
+
+### 减少重排重绘
+
+```javascript
+// ❌ 错误：多次修改 DOM 触发多次重排
+for (let i = 0; i < 100; i++) {
+  element.style.width = (i * 10) + 'px';
+}
+
+// ✅ 正确：批量修改
+element.style.cssText = 'width: 1000px; height: 1000px;';
+
+// ✅ 更好：使用 class
+element.classList.add('expanded');
+
+// ✅ 最佳：使用 requestAnimationFrame
+function animateWidth(element, targetWidth) {
+  let currentWidth = element.offsetWidth;
+  
+  function step() {
+    if (currentWidth < targetWidth) {
+      currentWidth += 1;
+      element.style.width = currentWidth + 'px';
+      requestAnimationFrame(step);
+    }
+  }
+  
+  requestAnimationFrame(step);
+}
+```
+
+### 节流与防抖
+
+```javascript
+// 防抖：连续触发后等待一段时间才执行
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
+
+// 节流：连续触发时每隔一段时间执行一次
+function throttle(func, limit) {
+  let inThrottle;
+  return function(...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
+
+// 使用场景
+const searchInput = document.getElementById('search');
+searchInput.addEventListener('input', debounce((e) => {
+  // 搜索请求
+  fetch(`/api/search?q=${e.target.value}`);
+}, 300));
+
+window.addEventListener('scroll', throttle(() => {
+  // 滚动处理
+  console.log('滚动位置:', window.scrollY);
+}, 100));
+```
+
+## 缓存策略
+
+### HTTP 缓存
+
+```nginx
+# Nginx 配置
+location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff2)$ {
+    expires 365d;
+    add_header Cache-Control "public, immutable";
+    access_log off;
+}
+
+location / {
+    # HTML 不缓存
+    add_header Cache-Control "no-cache";
+}
+```
+
+### Service Worker 缓存
+
+```javascript
+// service-worker.js
+const CACHE_NAME = 'vibe-coding-v1';
+const urlsToCache = [
+  '/',
+  '/index.html',
+  '/css/main.css',
+  '/js/main.js'
+];
+
+// 安装时缓存资源
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
+  );
+});
+
+// 拦截请求，优先使用缓存
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        // 缓存命中，返回缓存
+        if (response) {
+          return response;
+        }
+        
+        // 缓存未命中，网络请求
+        return fetch(event.request).then(response => {
+          // 克隆响应
+          const responseToCache = response.clone();
+          
+          // 存入缓存
+          caches.open(CACHE_NAME)
+            .then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+          
+          return response;
+        });
+      })
+  );
+});
+```
+
+## 构建优化
+
+### Tree Shaking
+
+```javascript
+// ❌ 错误：导入整个库
+import _ from 'lodash'; // 整个库 ~70KB
+
+// ✅ 正确：只导入需要的函数
+import debounce from 'lodash/debounce'; // 只导入一个函数 ~2KB
+
+// ✅ 更好：使用 ES 模块
+import { debounce, throttle } from 'lodash-es'; // 支持 tree-shaking
+```
+
+### 压缩与混淆
+
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite';
+import { visualizer } from 'rollup-plugin-visualizer';
+
+export default defineConfig({
+  build: {
+    minify: 'terser', // 或 'esbuild'
+    terserOptions: {
+      compress: {
+        drop_console: true, // 生产环境移除 console.log
+        drop_debugger: true, // 移除 debugger
+      }
+    },
+    rollupOptions: {
+      plugins: [
+        visualizer({ 
+          open: true, // 生成并打开可视化报告
+          filename: './stats.html'
+        })
+      ]
+    }
+  }
+});
+```
+
+## 性能监控
+
+### 真实用户监控 (RUM)
+
+```javascript
+// 使用 Performance API
+function measurePerformance() {
+  // 页面加载性能
+  const perfData = window.performance.timing;
+  const pageLoadTime = perfData.loadEventEnd - perfData.navigationStart;
+  
+  // 资源加载性能
+  const resources = performance.getEntriesByType('resource');
+  const slowResources = resources.filter(r => r.duration > 1000);
+  
+  // 发送性能数据
+  const metrics = {
+    pageLoadTime,
+    slowResources: slowResources.length,
+    url: window.location.pathname
+  };
+  
+  navigator.sendBeacon('/api/performance', JSON.stringify(metrics));
+}
+
+window.addEventListener('load', measurePerformance);
+```
+
+## 下一步
+
+- 学习 [第11章：前端工程化实践]()
+- 实战 [性能优化项目]()
+- 进阶 [Web Vitals 深度优化]()

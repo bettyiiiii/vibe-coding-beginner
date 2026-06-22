@@ -1,0 +1,515 @@
+---
+title: "状态管理进阶"
+chapter: "13"
+description: "掌握 Pinia 状态管理，学习全局状态、模块化 store、插件系统，以及状态持久化"
+---
+
+# 状态管理进阶
+
+> 当应用变得复杂，组件之间的状态共享成为挑战。状态管理工具帮你统一管理应用状态。
+
+## 为什么需要状态管理？
+
+### 状态共享的问题
+
+想象一个电商应用：
+- 顶部导航显示购物车数量
+- 商品详情页有"加入购物车"按钮
+- 购物车页面显示购物车内容
+- 结算页面需要购物车数据
+
+**问题**：这些组件都需要访问和修改购物车数据，如何共享？
+
+### 解决方案对比
+
+| 方案 | 适用场景 | 缺点 |
+|------|----------|------|
+| Props 层层传递 | 简单的父子组件 | 深层传递麻烦（prop drilling） |
+| Event Bus | 小型应用 | 难以调试，不支持 TypeScript |
+| Vuex/Pinia | 中大型应用 | 需要学习成本 |
+| Composables | 逻辑复用 | 不适合全局状态 |
+
+## Pinia 基础
+
+### 为什么选择 Pinia？
+
+- ✅ Vue 官方推荐（Vuex 的继任者）
+- ✅ TypeScript 支持完美
+- ✅ 轻量级（约 1KB）
+- ✅ 模块化设计
+- ✅ 开发工具支持
+
+### 安装 Pinia
+
+```bash
+npm install pinia
+```
+
+```javascript
+// src/main.js
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import App from './App.vue'
+
+const app = createApp(App)
+const pinia = createPinia()
+
+app.use(pinia)
+app.mount('#app')
+```
+
+## 创建 Store
+
+### 基础 Store
+
+```javascript
+// src/stores/counter.js
+import { defineStore } from 'pinia'
+
+export const useCounterStore = defineStore('counter', {
+  // 状态
+  state: () => ({
+    count: 0,
+    name: '计数器'
+  }),
+  
+  // 计算属性
+  getters: {
+    doubleCount(state) {
+      return state.count * 2
+    },
+    
+    // 在 getters 中使用其他 getters
+    doubleCountPlusOne(): number {
+      return this.doubleCount + 1
+    }
+  },
+  
+  // 方法
+  actions: {
+    increment() {
+      this.count++
+    },
+    
+    incrementBy(n) {
+      this.count += n
+    },
+    
+    // 异步 action
+    async fetchData() {
+      const data = await fetch('/api/data').then(res => res.json())
+      this.count = data.count
+    }
+  }
+})
+```
+
+### 组合式 Store（推荐）
+
+```javascript
+// src/stores/counter.js
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+
+export const useCounterStore = defineStore('counter', () => {
+  // state
+  const count = ref(0)
+  const name = ref('计数器')
+  
+  // getters
+  const doubleCount = computed(() => count.value * 2)
+  
+  // actions
+  function increment() {
+    count.value++
+  }
+  
+  function incrementBy(n) {
+    count.value += n
+  }
+  
+  async function fetchData() {
+    const data = await fetch('/api/data').then(res => res.json())
+    count.value = data.count
+  }
+  
+  return {
+    count,
+    name,
+    doubleCount,
+    increment,
+    incrementBy,
+    fetchData
+  }
+})
+```
+
+## 使用 Store
+
+### 在组件中使用
+
+```vue
+<script setup>
+import { useCounterStore } from '../stores/counter'
+
+// 使用 store
+const counter = useCounterStore()
+
+// 访问状态
+console.log(counter.count) // 0
+console.log(counter.doubleCount) // 0
+
+// 调用 action
+counter.increment()
+console.log(counter.count) // 1
+</script>
+
+<template>
+  <div>
+    <h1>{{ counter.name }}</h1>
+    <p>计数: {{ counter.count }}</p>
+    <p>双倍: {{ counter.doubleCount }}</p>
+    
+    <button @click="counter.increment()">+1</button>
+    <button @click="counter.incrementBy(5)">+5</button>
+    <button @click="counter.fetchData()">获取数据</button>
+  </div>
+</template>
+```
+
+### 解构 Store（保持响应式）
+
+```vue
+<script setup>
+import { storeToRefs } from 'pinia'
+import { useCounterStore } from '../stores/counter'
+
+const counter = useCounterStore()
+
+// ❌ 错误：解构会丢失响应式
+const { count, doubleCount } = counter
+
+// ✅ 正确：使用 storeToRefs
+const { count, doubleCount } = storeToRefs(counter)
+
+// actions 可以直接解构（不是响应式的）
+const { increment, incrementBy } = counter
+</script>
+
+<template>
+  <div>
+    <p>计数: {{ count }}</p>
+    <p>双倍: {{ doubleCount }}</p>
+  </div>
+</template>
+```
+
+## 实战：购物车 Store
+
+```javascript
+// src/stores/cart.js
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+
+export const useCartStore = defineStore('cart', () => {
+  // 状态：购物车商品列表
+  const items = ref([
+    // { id, name, price, quantity }
+  ])
+  
+  // 计算属性：购物车商品数量
+  const itemCount = computed(() =>
+    items.value.reduce((sum, item) => sum + item.quantity, 0)
+  )
+  
+  // 计算属性：购物车总价
+  const totalPrice = computed(() =>
+    items.value.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  )
+  
+  // 判断商品是否已在购物车中
+  function isInCart(productId) {
+    return items.value.some(item => item.id === productId)
+  }
+  
+  // 添加商品到购物车
+  function addItem(product) {
+    const existing = items.value.find(item => item.id === product.id)
+    
+    if (existing) {
+      // 已存在，增加数量
+      existing.quantity++
+    } else {
+      // 不存在，添加新商品
+      items.value.push({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: 1
+      })
+    }
+  }
+  
+  // 移除商品
+  function removeItem(productId) {
+    const index = items.value.findIndex(item => item.id === productId)
+    if (index > -1) {
+      items.value.splice(index, 1)
+    }
+  }
+  
+  // 更新商品数量
+  function updateQuantity(productId, quantity) {
+    const item = items.value.find(item => item.id === productId)
+    if (item) {
+      item.quantity = Math.max(0, quantity) // 不能小于 0
+      if (item.quantity === 0) {
+        removeItem(productId)
+      }
+    }
+  }
+  
+  // 清空购物车
+  function clearCart() {
+    items.value = []
+  }
+  
+  return {
+    items,
+    itemCount,
+    totalPrice,
+    isInCart,
+    addItem,
+    removeItem,
+    updateQuantity,
+    clearCart
+  }
+})
+```
+
+### 在组件中使用购物车
+
+```vue
+<!-- ProductList.vue -->
+<script setup>
+import { useCartStore } from '../stores/cart'
+
+const cart = useCartStore()
+
+const products = [
+  { id: 1, name: '商品A', price: 100 },
+  { id: 2, name: '商品B', price: 200 },
+  { id: 3, name: '商品C', price: 300 }
+]
+
+function addToCart(product) {
+  cart.addItem(product)
+  alert(`已添加 ${product.name} 到购物车`)
+}
+</script>
+
+<template>
+  <div>
+    <h2>商品列表</h2>
+    <ul>
+      <li v-for="product in products" :key="product.id">
+        {{ product.name }} - ¥{{ product.price }}
+        <button @click="addToCart(product)">加入购物车</button>
+      </li>
+    </ul>
+  </div>
+</template>
+```
+
+```vue
+<!-- ShoppingCart.vue -->
+<script setup>
+import { useCartStore } from '../stores/cart'
+
+const cart = useCartStore()
+</script>
+
+<template>
+  <div>
+    <h2>购物车 ({{ cart.itemCount }} 件)</h2>
+    <p>总价: ¥{{ cart.totalPrice }}</p>
+    
+    <ul>
+      <li v-for="item in cart.items" :key="item.id">
+        {{ item.name }} - ¥{{ item.price }} x {{ item.quantity }}
+        <button @click="cart.updateQuantity(item.id, item.quantity - 1)">-</button>
+        <span>{{ item.quantity }}</span>
+        <button @click="cart.updateQuantity(item.id, item.quantity + 1)">+</button>
+        <button @click="cart.removeItem(item.id)">删除</button>
+      </li>
+    </ul>
+    
+    <button @click="cart.clearCart()">清空购物车</button>
+  </div>
+</template>
+```
+
+## 状态持久化
+
+### 使用 pinia-plugin-persistedstate
+
+```bash
+npm install pinia-plugin-persistedstate
+```
+
+```javascript
+// src/main.js
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+
+const pinia = createPinia()
+pinia.use(piniaPluginPersistedstate)
+
+createApp(App)
+  .use(pinia)
+  .mount('#app')
+```
+
+```javascript
+// src/stores/cart.js
+export const useCartStore = defineStore('cart', () => {
+  const items = ref([])
+  
+  // ... 其他代码
+  
+  return { items, /* ... */ }
+}, {
+  // 启用持久化
+  persist: true
+  
+  // 或自定义配置
+  // persist: {
+  //   key: 'cart',
+  //   storage: localStorage,
+  //   paths: ['items'] // 只持久化 items
+  // }
+})
+```
+
+## 多个 Store 之间的交互
+
+### 在一个 Store 中使用另一个 Store
+
+```javascript
+// src/stores/user.js
+export const useUserStore = defineStore('user', () => {
+  const user = ref(null)
+  const token = ref('')
+  
+  function login(username, password) {
+    // 登录逻辑
+    // ...
+  }
+  
+  function logout() {
+    user.value = null
+    token.value = ''
+  }
+  
+  return { user, token, login, logout }
+})
+```
+
+```javascript
+// src/stores/orders.js
+import { useUserStore } from './user'
+
+export const useOrderStore = defineStore('orders', () => {
+  const orders = ref([])
+  
+  async function fetchOrders() {
+    // 使用 user store
+    const userStore = useUserStore()
+    
+    if (!userStore.token) {
+      throw new Error('请先登录')
+    }
+    
+    const response = await fetch('/api/orders', {
+      headers: {
+        'Authorization': `Bearer ${userStore.token}`
+      }
+    })
+    
+    orders.value = await response.json()
+  }
+  
+  return { orders, fetchOrders }
+})
+```
+
+## 最佳实践
+
+### 1. Store 设计原则
+
+- **单一职责**: 每个 store 管理一个功能模块
+- **扁平化状态**: 避免嵌套过深
+- **使用 actions 修改状态**: 不要直接修改 state
+- **异步操作放在 actions 中**
+
+### 2. 项目结构
+
+```
+src/stores/
+├── index.js          # 导出所有 stores
+├── user.js           # 用户相关
+├── cart.js           # 购物车
+├── products.js       # 商品
+├── orders.js         # 订单
+└── app.js            # 应用全局状态
+```
+
+### 3. TypeScript 支持
+
+```typescript
+// src/stores/counter.ts
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+
+interface CounterState {
+  count: number
+  name: string
+}
+
+export const useCounterStore = defineStore('counter', () => {
+  const count = ref<number>(0)
+  const name = ref<string>('计数器')
+  
+  const doubleCount = computed<number>(() => count.value * 2)
+  
+  function increment(): void {
+    count.value++
+  }
+  
+  return {
+    count,
+    name,
+    doubleCount,
+    increment
+  }
+})
+```
+
+## 小结
+
+✅ **已完成：**
+- 理解了状态管理的必要性
+- 掌握了 Pinia 的基础用法
+- 学会了组合式 Store 的编写
+- 实现了购物车实战案例
+- 学会了状态持久化
+- 理解了多个 Store 的交互
+
+🚀 **下一步：**
+- 学习 Vue 高级特性（Teleport、Suspense）
+- 掌握性能优化（虚拟滚动、懒加载）
+- 学习测试（Vitest + Vue Test Utils）
+- 构建完整的 Vue 全栈项目
+
+💡 **提示：** Pinia 的开发者工具非常强大，安装 Vue DevTools 可以轻松调试状态！

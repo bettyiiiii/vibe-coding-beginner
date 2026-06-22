@@ -1,0 +1,548 @@
+---
+title: "Vue 框架实战"
+chapter: "12"
+description: "学习 Vue 3 组合式 API，掌握组件开发、响应式数据、生命周期，构建交互式前端应用"
+---
+
+# Vue 框架实战
+
+> Vue 是一套用于构建用户界面的渐进式框架，与其他大型框架不同，Vue 被设计为可以自底向上逐层应用。
+
+## 为什么选择 Vue？
+
+### Vue 的优势
+
+- **渐进式框架**: 可以只用核心库，也可以整合完整生态
+- **易学易用**: 文档友好，上手快
+- **性能优秀**: 虚拟 DOM + 响应式系统
+- **生态丰富**: Vue Router、Pinia、Vite 等
+
+### Vue 3 vs Vue 2
+
+| 特性 | Vue 2 | Vue 3 |
+|------|--------|--------|
+| API 风格 | Options API | Composition API + Options API |
+| 性能 | 较好 | 更好（Proxy 响应式） |
+| TypeScript | 支持有限 | 原生支持 |
+| 包大小 | 较大 | 更小（Tree-shaking） |
+
+## 快速开始
+
+### 使用 Vite 创建 Vue 项目
+
+```bash
+# 创建 Vue 项目
+npm create vite@latest my-vue-app -- --template vue
+
+# 进入项目目录
+cd my-vue-app
+
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+```
+
+### 项目结构
+
+```
+my-vue-app/
+├── src/
+│   ├── components/      # 组件
+│   ├── views/          # 页面组件
+│   ├── router/         # 路由配置
+│   ├── stores/         # 状态管理（Pinia）
+│   ├── App.vue         # 根组件
+│   └── main.js         # 入口文件
+├── public/             # 静态资源
+└── package.json
+```
+
+## 组合式 API（Composition API）
+
+### 响应式数据：ref 和 reactive
+
+```vue
+<script setup>
+import { ref, reactive, computed } from 'vue'
+
+// ref: 用于基本类型
+const count = ref(0)
+const message = ref('Hello Vue!')
+
+// reactive: 用于对象
+const user = reactive({
+  name: '张三',
+  age: 25,
+  email: 'zhangsan@example.com'
+})
+
+// 计算属性
+const doubleCount = computed(() => count.value * 2)
+
+// 方法
+function increment() {
+  count.value++
+}
+
+function updateUser() {
+  user.age++
+}
+</script>
+
+<template>
+  <div>
+    <h1>{{ message }}</h1>
+    <p>计数: {{ count }}</p>
+    <p>双倍: {{ doubleCount }}</p>
+    <button @click="increment">增加</button>
+    
+    <h2>用户信息</h2>
+    <p>姓名: {{ user.name }}</p>
+    <p>年龄: {{ user.age }}</p>
+    <button @click="updateUser">增加年龄</button>
+  </div>
+</template>
+```
+
+### 生命周期钩子
+
+```vue
+<script setup>
+import { onMounted, onUpdated, onUnmounted } from 'vue'
+
+// 组件挂载后
+onMounted(() => {
+  console.log('组件已挂载')
+  // 可以在这里发起 API 请求
+  fetchData()
+})
+
+// 组件更新后
+onUpdated(() => {
+  console.log('组件已更新')
+})
+
+// 组件卸载前
+onUnmounted(() => {
+  console.log('组件已卸载')
+  // 清理定时器、取消订阅等
+})
+</script>
+```
+
+## 组件开发
+
+### 组件通信：Props 和 Emits
+
+```vue
+<!-- 子组件：UserProfile.vue -->
+<script setup>
+// 定义 props
+const props = defineProps({
+  user: {
+    type: Object,
+    required: true
+  },
+  isEditable: {
+    type: Boolean,
+    default: false
+  }
+})
+
+// 定义 emits
+const emit = defineEmits(['update', 'delete'])
+
+function handleUpdate() {
+  emit('update', props.user.id)
+}
+
+function handleDelete() {
+  emit('delete', props.user.id)
+}
+</script>
+
+<template>
+  <div class="user-profile">
+    <h3>{{ user.name }}</h3>
+    <p>{{ user.email }}</p>
+    <p>年龄: {{ user.age }}</p>
+    
+    <div v-if="isEditable">
+      <button @click="handleUpdate">编辑</button>
+      <button @click="handleDelete">删除</button>
+    </div>
+  </div>
+</template>
+```
+
+```vue
+<!-- 父组件 -->
+<script setup>
+import UserProfile from './UserProfile.vue'
+
+const users = ref([
+  { id: 1, name: '张三', email: 'zhangsan@example.com', age: 25 }
+])
+
+function handleUpdate(userId) {
+  console.log('更新用户:', userId)
+}
+
+function handleDelete(userId) {
+  users.value = users.value.filter(u => u.id !== userId)
+}
+</script>
+
+<template>
+  <div>
+    <UserProfile 
+      v-for="user in users" 
+      :key="user.id"
+      :user="user" 
+      :isEditable="true"
+      @update="handleUpdate"
+      @delete="handleDelete"
+    />
+  </div>
+</template>
+```
+
+### 插槽（Slots）
+
+```vue
+<!-- 布局组件：BaseLayout.vue -->
+<script setup>
+</script>
+
+<template>
+  <div class="layout">
+    <header>
+      <slot name="header">默认头部</slot>
+    </header>
+    
+    <main>
+      <slot>默认内容</slot>
+    </main>
+    
+    <footer>
+      <slot name="footer">默认底部</slot>
+    </footer>
+  </div>
+</template>
+```
+
+```vue
+<!-- 使用布局组件 -->
+<script setup>
+import BaseLayout from './BaseLayout.vue'
+</script>
+
+<template>
+  <BaseLayout>
+    <template #header>
+      <h1>我的网站</h1>
+      <nav>
+        <a href="/">首页</a>
+        <a href="/about">关于</a>
+      </nav>
+    </template>
+    
+    <p>这是主要内容区域</p>
+    
+    <template #footer>
+      <p>© 2026 我的网站</p>
+    </template>
+  </BaseLayout>
+</template>
+```
+
+## 实战：待办事项应用
+
+```vue
+<!-- TodoApp.vue -->
+<script setup>
+import { ref, computed } from 'vue'
+
+const todos = ref([
+  { id: 1, text: '学习 Vue 基础', done: true },
+  { id: 2, text: '掌握组合式 API', done: false },
+  { id: 3, text: '完成待办应用', done: false }
+])
+
+const newTodo = ref('')
+const filter = ref('all') // all, active, completed
+
+// 添加待办
+function addTodo() {
+  if (newTodo.value.trim() === '') return
+  
+  todos.value.push({
+    id: Date.now(),
+    text: newTodo.value,
+    done: false
+  })
+  
+  newTodo.value = ''
+}
+
+// 删除待办
+function removeTodo(id) {
+  todos.value = todos.value.filter(todo => todo.id !== id)
+}
+
+// 切换完成状态
+function toggleTodo(id) {
+  const todo = todos.value.find(t => t.id === id)
+  if (todo) {
+    todo.done = !todo.done
+  }
+}
+
+// 过滤待办
+const filteredTodos = computed(() => {
+  switch (filter.value) {
+    case 'active':
+      return todos.value.filter(todo => !todo.done)
+    case 'completed':
+      return todos.value.filter(todo => todo.done)
+    default:
+      return todos.value
+  }
+})
+
+// 统计
+const activeCount = computed(() => todos.value.filter(t => !todo.done).length)
+</script>
+
+<template>
+  <div class="todo-app">
+    <h1>待办事项</h1>
+    
+    <!-- 添加待办 -->
+    <div class="add-todo">
+      <input 
+        v-model="newTodo" 
+        @keyup.enter="addTodo"
+        placeholder="输入新的待办事项..."
+      />
+      <button @click="addTodo">添加</button>
+    </div>
+    
+    <!-- 过滤器 -->
+    <div class="filters">
+      <button 
+        :class="{ active: filter === 'all' }"
+        @click="filter = 'all'"
+      >全部</button>
+      <button 
+        :class="{ active: filter === 'active' }"
+        @click="filter = 'active'"
+      >进行中</button>
+      <button 
+        :class="{ active: filter === 'completed' }"
+        @click="filter = 'completed'"
+      >已完成</button>
+    </div>
+    
+    <!-- 待办列表 -->
+    <ul class="todo-list">
+      <li 
+        v-for="todo in filteredTodos" 
+        :key="todo.id"
+        :class="{ done: todo.done }"
+      >
+        <input 
+          type="checkbox" 
+          :checked="todo.done"
+          @change="toggleTodo(todo.id)"
+        />
+        <span>{{ todo.text }}</span>
+        <button @click="removeTodo(todo.id)">删除</button>
+      </li>
+    </ul>
+    
+    <!-- 统计 -->
+    <div class="stats">
+      剩余 {{ activeCount }} 项
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.todo-app {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.add-todo {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.add-todo input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.todo-list {
+  list-style: none;
+  padding: 0;
+}
+
+.todo-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.todo-list li.done span {
+  text-decoration: line-through;
+  color: #999;
+}
+
+.filters button.active {
+  background-color: #4CAF50;
+  color: white;
+}
+</style>
+```
+
+## Vue Router 路由
+
+### 基础路由配置
+
+```javascript
+// src/router/index.js
+import { createRouter, createWebHistory } from 'vue-router'
+import Home from '../views/Home.vue'
+import About from '../views/About.vue'
+import User from '../views/User.vue'
+
+const routes = [
+  { path: '/', component: Home },
+  { path: '/about', component: About },
+  { path: '/user/:id', component: User }
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+export default router
+```
+
+```javascript
+// src/main.js
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+
+createApp(App)
+  .use(router)
+  .mount('#app')
+```
+
+### 路由导航
+
+```vue
+<script setup>
+import { useRouter, useRoute } from 'vue-router'
+
+const router = useRouter()
+const route = useRoute()
+
+// 编程式导航
+function goToUser(id) {
+  router.push(`/user/${id}`)
+}
+
+function goBack() {
+  router.back()
+}
+
+// 获取路由参数
+const userId = route.params.id
+</script>
+
+<template>
+  <div>
+    <!-- 声明式导航 -->
+    <router-link to="/">首页</router-link>
+    <router-link to="/about">关于</router-link>
+    
+    <!-- 路由出口 -->
+    <router-view></router-view>
+  </div>
+</template>
+```
+
+## 最佳实践
+
+### 1. 组件设计原则
+
+- **单一职责**: 每个组件只做一件事
+- **props 验证**: 使用 TypeScript 或 PropTypes
+- **事件命名**: 使用 kebab-case
+- **插槽使用**: 提高组件灵活性
+
+### 2. 性能优化
+
+```vue
+<script setup>
+import { defineAsyncComponent } from 'vue'
+
+// 懒加载组件
+const HeavyComponent = defineAsyncComponent(() =>
+  import('./HeavyComponent.vue')
+)
+
+// 使用 v-memo 减少重新渲染
+</script>
+
+<template>
+  <div>
+    <!-- 懒加载 -->
+    <Suspense>
+      <HeavyComponent />
+    </Suspense>
+  </div>
+</template>
+```
+
+### 3. 代码组织
+
+```
+src/
+├── components/        # 通用组件
+│   ├── base/         # 基础组件（按钮、输入框等）
+│   └── business/     # 业务组件
+├── composables/       # 组合式函数
+├── utils/             # 工具函数
+└── constants/         # 常量
+```
+
+## 小结
+
+✅ **已完成：**
+- 掌握了 Vue 3 组合式 API
+- 学会了组件开发和通信
+- 理解了响应式数据（ref、reactive）
+- 实现了待办事项应用
+- 了解了 Vue Router 路由
+
+🚀 **下一步：**
+- 学习 Pinia 状态管理
+- 掌握 Vue 3 高级特性
+- 学习性能优化技巧
+- 构建完整的 Vue 项目
+
+💡 **提示：** Vue 的官方文档非常友好，遇到问题优先查阅官方文档！

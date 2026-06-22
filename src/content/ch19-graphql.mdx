@@ -1,0 +1,551 @@
+---
+title: "GraphQL API 开发"
+chapter: "19"
+description: "学习 GraphQL 查询语言、Apollo Server/Client、Schema 设计、性能优化，掌握现代 API 开发"
+---
+
+# GraphQL API 开发
+
+> REST 是"服务员点菜"，GraphQL 是"自助餐"。
+
+## REST vs GraphQL
+
+### REST 的问题
+
+```
+❌ 问题 1：多次请求
+客户端需要：
+1. 获取用户信息 → GET /users/1
+2. 获取用户的文章 → GET /users/1/posts
+3. 获取文章评论 → GET /posts/1/comments
+
+总共需要 3 次请求！
+```
+
+```
+❌ 问题 2：数据过多或过少
+GET /users/1 返回：
+{
+  "id": 1,
+  "name": "张三",
+  "email": "zhangsan@example.com",
+  "phone": "13800138000",
+  "address": "北京市朝阳区",
+  "created_at": "2026-01-01"
+}
+
+客户端只需要 name 和 email，但拿到了所有字段！
+```
+
+### GraphQL 的优势
+
+```
+✅ 优势 1：一次请求获取所有数据
+query {
+  user(id: 1) {
+    name
+    email
+    posts {
+      title
+      comments {
+        content
+      }
+    }
+  }
+}
+
+一次请求拿到所有需要的数据！
+```
+
+```
+✅ 优势 2：只获取需要的字段
+query {
+  user(id: 1) {
+    name
+    email
+  }
+}
+
+只返回 name 和 email，不多拿数据！
+```
+
+## GraphQL 基础
+
+### Schema 定义语言（SDL）
+
+```graphql
+# 定义类型
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  age: Int
+  posts: [Post!]!
+}
+
+type Post {
+  id: ID!
+  title: String!
+  content: String!
+  author: User!
+  comments: [Comment!]!
+}
+
+type Comment {
+  id: ID!
+  content: String!
+  author: User!
+}
+
+# 查询类型（相当于 GET）
+type Query {
+  users: [User!]!
+  user(id: ID!): User
+  posts: [Post!]!
+  post(id: ID!): Post
+}
+
+# 修改类型（相当于 POST/PUT/DELETE）
+type Mutation {
+  createUser(name: String!, email: String!): User!
+  updateUser(id: ID!, name: String, email: String): User!
+  deleteUser(id: ID!): Boolean!
+}
+
+# 订阅类型（实时更新）
+type Subscription {
+  userCreated: User!
+  postPublished: Post!
+}
+```
+
+## Apollo Server（服务器端）
+
+### 安装依赖
+
+```bash
+npm install @apollo/server graphql
+```
+
+### 创建 Apollo Server
+
+```javascript
+// server.js
+const { ApolloServer } = require('@apollo/server')
+const { startStandaloneServer } = require('@apollo/server/standalone')
+const { buildSubscriptonResolver = require('@apollo/server/subscriptions')
+
+// 定义 Schema
+const typeDefs = `#graphql
+  type User {
+    id: ID!
+    name: String!
+    email: String!
+    age: Int
+  }
+  
+  type Query {
+    users: [User!]!
+    user(id: ID!): User
+  }
+  
+  type Mutation {
+    createUser(name: String!, email: String!): User!
+  }
+`
+
+// 模拟数据
+const users = [
+  { id: '1', name: '张三', email: 'zhangsan@example.com', age: 25 },
+  { id: '2', name: '李四', email: 'lisi@example.com', age: 30 }
+]
+
+// 定义 Resolvers
+const resolvers = {
+  Query: {
+    users: () => users,
+    user: (_, { id }) => users.find(u => u.id === id)
+  },
+  
+  Mutation: {
+    createUser: (_, { name, email }) => {
+      const newUser = {
+        id: String(users.length + 1),
+        name,
+        email,
+        age: null
+      }
+      users.push(newUser)
+      return newUser
+    }
+  }
+}
+
+// 创建 Apollo Server
+async function startServer() {
+  const server = new ApolloServer({
+    typeDefs,
+    resolvers
+  })
+  
+  const { url } = await startStandaloneServer(server, {
+    listen: { port: 4000 }
+  })
+  
+  console.log(`🚀 Server ready at ${url}`)
+}
+
+startServer()
+```
+
+## 查询（Query）
+
+### 基础查询
+
+```graphql
+# 查询所有用户
+query {
+  users {
+    id
+    name
+    email
+  }
+}
+
+# 查询指定用户
+query {
+  user(id: "1") {
+    id
+    name
+    email
+    age
+  }
+}
+```
+
+### 带参数的查询
+
+```graphql
+# 定义查询（带变量）
+query GetUser($userId: ID!) {
+  user(id: $userId) {
+    id
+    name
+    email
+  }
+}
+
+# 变量
+{
+  "userId": "1"
+}
+```
+
+### 别名（Alias）
+
+```graphql
+# 一次查询多个用户（使用别名）
+query {
+  user1: user(id: "1") {
+    name
+    email
+  }
+  user2: user(id: "2") {
+    name
+    email
+  }
+}
+```
+
+### 片段（Fragment）
+
+```graphql
+# 定义片段（可复用）
+fragment UserFields on User {
+  id
+  name
+  email
+  age
+}
+
+# 使用片段
+query {
+  users {
+    ...UserFields
+  }
+}
+```
+
+## 修改（Mutation）
+
+### 创建数据
+
+```graphql
+mutation CreateUser($name: String!, $email: String!) {
+  createUser(name: $name, email: $email) {
+    id
+    name
+    email
+  }
+}
+
+# 变量
+{
+  "name": "王五",
+  "email": "wangwu@example.com"
+}
+```
+
+### 更新数据
+
+```graphql
+mutation UpdateUser($id: ID!, $name: String) {
+  updateUser(id: $id, name: $name) {
+    id
+    name
+    email
+  }
+}
+
+# 变量
+{
+  "id": "1",
+  "name": "张三（改名）"
+}
+```
+
+### 删除数据
+
+```graphql
+mutation DeleteUser($id: ID!) {
+  deleteUser(id: $id)
+}
+
+# 变量
+{
+  "id": "1"
+}
+```
+
+## Apollo Client（客户端）
+
+### 安装依赖
+
+```bash
+npm install @apollo/client graphql
+```
+
+### 创建 Apollo Client
+
+```javascript
+// client.js
+import { ApolloClient, InMemoryCache } from '@apollo/client'
+
+const client = new ApolloClient({
+  uri: 'http://localhost:4000',
+  cache: new InMemoryCache()
+})
+
+export default client
+```
+
+### 发送查询
+
+```javascript
+import { gql } from '@apollo/client'
+import client from './client'
+
+// 定义查询
+const GET_USERS = gql`
+  query GetUsers {
+    users {
+      id
+      name
+      email
+    }
+  }
+`
+
+// 发送查询
+client.query({
+  query: GET_USERS
+})
+  .then(result => {
+    console.log(result.data.users)
+  })
+  .catch(error => {
+    console.error(error)
+  })
+```
+
+### 使用 React Hooks
+
+```javascript
+// App.jsx
+import { ApolloProvider } from '@apollo/client'
+import client from './client'
+import UserList from './UserList'
+
+function App() {
+  return (
+    <ApolloProvider client={client}>
+      <UserList />
+    </ApolloProvider>
+  )
+}
+```
+
+```javascript
+// UserList.jsx
+import { useQuery, gql } from '@apollo/client'
+
+const GET_USERS = gql`
+  query GetUsers {
+    users {
+      id
+      name
+      email
+    }
+  }
+`
+
+function UserList() {
+  const { loading, error, data } = useQuery(GET_USERS)
+  
+  if (loading) return <p>加载中...</p>
+  if (error) return <p>错误: {error.message}</p>
+  
+  return (
+    <ul>
+      {data.users.map(user => (
+        <li key={user.id}>
+          {user.name} - {user.email}
+        </li>
+      ))}
+    </ul>
+  )
+}
+```
+
+```javascript
+// CreateUser.jsx
+import { useMutation, gql } from '@apollo/client'
+
+const CREATE_USER = gql`
+  mutation CreateUser($name: String!, $email: String!) {
+    createUser(name: $name, email: $email) {
+      id
+      name
+      email
+    }
+  }
+`
+
+function CreateUser() {
+  const [createUser, { data, loading, error }] = useMutation(CREATE_USER)
+  
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    
+    createUser({
+      variables: {
+        name: formData.get('name'),
+        email: formData.get('email')
+      }
+    })
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input name="name" placeholder="姓名" required />
+      <input name="email" type="email" placeholder="邮箱" required />
+      <button type="submit" disabled={loading}>
+        {loading ? '创建中...' : '创建用户'}
+      </button>
+      
+      {error && <p>错误: {error.message}</p>}
+      {data && <p>用户创建成功: {data.createUser.name}</p>}
+    </form>
+  )
+}
+```
+
+## 性能优化
+
+### 1. DataLoader（批处理和缓存）
+
+```javascript
+const DataLoader = require('dataloader')
+
+// 创建 Loader
+const userLoader = new DataLoader(async (userIds) => {
+  // 批量查询
+  const users = await User.find({ _id: { $in: userIds } })
+  return userIds.map(id => users.find(u => u.id === id))
+})
+
+// 在 Resolver 中使用
+const resolvers = {
+  Post: {
+    author: (post) => userLoader.load(post.authorId)
+  }
+}
+```
+
+### 2. 分页
+
+```graphql
+type Query {
+  users(first: Int, after: String): UserConnection!
+}
+
+type UserConnection {
+  edges: [UserEdge!]!
+  pageInfo: PageInfo!
+}
+
+type UserEdge {
+  node: User!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+```
+
+### 3. 缓存策略
+
+```javascript
+// Apollo Client 缓存
+const client = new ApolloClient({
+  uri: 'http://localhost:4000',
+  cache: new InMemoryCache({
+    typePolicies: {
+      User: {
+        // 使用 id 作为缓存键
+        keyFields: ['id']
+      }
+    }
+  })
+})
+```
+
+## 小结
+
+✅ **已完成：**
+- 理解了 REST 和 GraphQL 的区别
+- 学会了 GraphQL Schema 定义
+- 掌握了 Apollo Server 开发
+- 学会了查询（Query）和修改（Mutation）
+- 掌握了 Apollo Client 开发
+- 了解了性能优化技巧
+
+🚀 **下一步：**
+- 学习 Serverless 无服务器架构
+- 了解监控与日志
+- 完成项目实战案例
+
+💡 **提示：** GraphQL 不是 REST 的替代品，而是补充。根据场景选择合适的 API 设计风格！

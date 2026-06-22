@@ -1,0 +1,392 @@
+---
+title: "前端工程化实践"
+chapter: "11"
+description: "代码规范、Git 工作流、CI/CD、自动化测试、代码审查"
+---
+
+# 前端工程化实践
+
+> 工程化是团队协作的基石，让代码质量可控、可维护。
+
+## 代码规范与检查
+
+### ESLint 配置
+
+```javascript
+// .eslintrc.cjs
+module.exports = {
+  root: true,
+  env: {
+    browser: true,
+    es2024: true,
+    node: true,
+  },
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'plugin:react/recommended',
+    'plugin:prettier/recommended', // 集成 Prettier
+  ],
+  parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint', 'react'],
+  rules: {
+    // 自定义规则
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    'no-unused-vars': 'off', // 交给 TS
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    
+    // React 规则
+    'react/react-in-jsx-scope': 'off', // Next.js 不需要
+    'react/prop-types': 'off', // 使用 TypeScript
+  },
+  settings: {
+    react: {
+      version: 'detect',
+    },
+  },
+}
+```
+
+### Prettier 配置
+
+```javascript
+// .prettierrc.cjs
+module.exports = {
+  semi: true,        // 分号
+  singleQuote: false, // 双引号
+  tabWidth: 2,        // 缩进
+  trailingComma: 'es5', // 尾逗号
+  printWidth: 100,     // 每行长度
+  bracketSpacing: true,
+  jsxBracketSameLine: false,
+}
+```
+
+### 编辑器集成
+
+```json
+// .vscode/settings.json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  }
+}
+```
+
+## Git 工作流
+
+### 分支策略（Git Flow）
+
+```
+main/master     ─── 生产环境
+  │
+  ├── develop      ─── 开发环境
+  │     │
+  │     ├── feature/login    ─── 功能分支
+  │     ├── feature/dashboard
+  │     │
+  │     └── release/v1.2.0   ─── 发布分支
+  │
+  └── hotfix/critical-bug  ─── 热修复
+```
+
+### 提交信息规范（Conventional Commits）
+
+```bash
+# 格式：<type>(<scope>): <subject>
+
+git commit -m "feat(auth): add login functionality"
+git commit -m "fix(api): handle network error in user service"
+git commit -m "docs: update README with deployment steps"
+git commit -m "style: format code with prettier"
+git commit -m "refactor(utils): simplify date formatting function"
+git commit -m "test: add unit tests for user service"
+git commit -m "chore(deps): upgrade vite to v5"
+```
+
+| 类型 | 说明 |
+|------|------|
+| feat | 新功能 |
+| fix | 修复 bug |
+| docs | 文档变更 |
+| style | 代码格式（不影响功能）|
+| refactor | 重构 |
+| test | 测试相关 |
+| chore | 构建/工具链变更 |
+
+### Husky + lint-staged
+
+```bash
+# 安装
+npm install -D husky lint-staged
+
+# 初始化 Husky
+npx husky install
+
+# 添加 pre-commit 钩子
+npx husky add .husky/pre-commit "npx lint-staged"
+```
+
+```javascript
+// package.json
+{
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": ["eslint --fix", "prettier --write"],
+    "*.{json,md,yml}": ["prettier --write"]
+  }
+}
+```
+
+## CI/CD 流水线
+
+### GitHub Actions 配置
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Type check
+        run: npm run type-check
+      
+      - name: Test
+        run: npm run test -- --coverage
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+```
+
+### 自动部署
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    needs: lint-and-test # 确保 CI 通过
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.ORG_ID }}
+          vercel-project-id: ${{ secrets.PROJECT_ID }}
+          vercel-args: '--prod'
+```
+
+## 自动化测试
+
+### 单元测试（Vitest）
+
+```javascript
+// utils/format.test.js
+import { describe, expect, test } from 'vitest'
+import { formatDate, truncate } from './format'
+
+describe('formatDate', () => {
+  test('formats ISO string to localized date', () => {
+    const input = '2026-06-22T13:45:00.000Z'
+    const result = formatDate(input)
+    expect(result).toBe('2026年6月22日')
+  })
+})
+
+describe('truncate', () => {
+  test('truncates long string and adds ellipsis', () => {
+    expect(truncate('Hello World', 5)).toBe('Hello...')
+  })
+  
+  test('returns original string if under limit', () => {
+    expect(truncate('Hello', 10)).toBe('Hello')
+  })
+})
+```
+
+### 组件测试（React Testing Library）
+
+```javascript
+// components/Button.test.jsx
+import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, expect, test } from 'vitest'
+import Button from './Button'
+
+describe('Button', () => {
+  test('renders children', () => {
+    render(<Button>Click me</Button>)
+    expect(screen.getByText('Click me')).toBeInTheDocument()
+  })
+
+  test('calls onClick when clicked', async () => {
+    const handleClick = vi.fn()
+    render(<Button onClick={handleClick}>Click me</Button>)
+    
+    await fireEvent.click(screen.getByText('Click me'))
+    expect(handleClick).toHaveBeenCalledTimes(1)
+  })
+
+  test('is disabled when disabled prop is true', () => {
+    render(<Button disabled>Click me</Button>)
+    expect(screen.getByText('Click me')).toBeDisabled()
+  })
+})
+```
+
+### E2E 测试（Playwright）
+
+```javascript
+// e2e/auth.spec.js
+import { test, expect } from '@playwright/test'
+
+test('user can log in', async ({ page }) => {
+  await page.goto('https://example.com/login')
+  
+  await page.fill('[name="email"]', 'user@example.com')
+  await page.fill('[name="password"]', 'password123')
+  await page.click('button[type="submit"]')
+  
+  await page.waitForURL('**/dashboard')
+  await expect(page.locator('h1')).toHaveText('Dashboard')
+})
+```
+
+## 代码审查（Code Review）
+
+### Review 清单
+
+```markdown
+## Code Review 清单
+
+### 功能
+- [ ] 功能是否符合需求？
+- [ ] 边界情况是否处理？
+- [ ] 错误处理是否完善？
+
+### 代码质量
+- [ ] 命名是否清晰？
+- [ ] 函数是否单一职责？
+- [ ] 是否有重复代码？
+
+### 性能
+- [ ] 是否有不必要的重渲染？
+- [ ] 是否有内存泄漏风险？
+- [ ] 大列表是否使用虚拟滚动？
+
+### 安全
+- [ ] 是否有 XSS 风险？
+- [ ] 是否有 SQL 注入风险？
+- [ ] 敏感数据是否加密？
+
+### 可维护性
+- [ ] 是否有足够的注释？
+- [ ] 是否容易测试？
+- [ ] 类型定义是否完善？
+```
+
+### PR 模板
+
+```markdown
+# PR 描述
+
+## 变更类型
+- [ ] Bug 修复
+- [ ] 新功能
+- [ ] 重构
+- [ ] 文档更新
+
+## 变更说明
+<!-- 详细描述你的变更 -->
+
+## 截图/录屏
+<!-- 如果涉及 UI 变更，请附上截图 -->
+
+## 测试计划
+<!-- 描述你如何测试这些变更 -->
+
+## Checklist
+- [ ] 已添加测试
+- [ ] 已更新文档
+- [ ] 已通过所有 lint 检查
+```
+
+## Monorepo 管理
+
+### Turborepo 配置
+
+```json
+// turbo.json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    },
+    "lint": {
+      "outputs": []
+    },
+    "dev": {
+      "cache": false
+    }
+  }
+}
+```
+
+```json
+// package.json (根目录)
+{
+  "name": "my-monorepo",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "dev": "turbo run dev --parallel"
+  }
+}
+```
+
+## 下一步
+
+- 学习 [第12章：React 框架实战]()
+- 实战 [搭建 Monorepo 项目]()
+- 进阶 [微前端架构]()

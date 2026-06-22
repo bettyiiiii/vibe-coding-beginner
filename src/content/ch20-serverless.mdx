@@ -1,0 +1,467 @@
+---
+title: "Serverless 无服务器架构"
+chapter: "20"
+description: "学习 Serverless 概念、AWS Lambda、Vercel Functions、BFF 层设计，掌握无服务器开发"
+---
+
+# Serverless 无服务器架构
+
+> Serverless 不是"没有服务器"，而是"不用管服务器"。
+
+## 什么是 Serverless？
+
+### 传统服务器 vs Serverless
+
+```
+传统服务器：
+1. 买服务器（或租云服务器）
+2. 配置环境（Node.js、Nginx 等）
+3. 部署应用
+4. 监控服务器状态
+5. 扩容/缩容
+6. 处理故障
+
+问题：运维成本高
+```
+
+```
+Serverless：
+1. 写好函数
+2. 上传到云平台
+3. 配置触发器（HTTP 请求、定时任务等）
+4. 完成！
+
+优势：
+- 不用管服务器
+- 按调用次数计费
+- 自动扩容
+- 高可用
+```
+
+### Serverless 的优缺点
+
+| 优点 | 缺点 |
+|------|------|
+| 无需运维 | 冷启动延迟 |
+| 按量计费 | 不适合长时间任务 |
+| 自动扩容 | 供应商锁定 |
+| 高可用 | 调试困难 |
+
+## AWS Lambda
+
+### 什么是 AWS Lambda？
+
+AWS Lambda 是 Amazon 提供的 Serverless 计算服务。
+
+### 创建 Lambda 函数（Node.js）
+
+```javascript
+// index.js
+exports.handler = async (event, context) => {
+  console.log('Event:', JSON.stringify(event, null, 2))
+  
+  const response = {
+    statusCode: 200,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: 'Hello from Lambda!',
+      input: event
+    })
+  }
+  
+  return response
+}
+```
+
+### 部署到 AWS Lambda
+
+```bash
+# 安装 AWS CLI
+# 配置 AWS CLI
+aws configure
+
+# 打包函数
+zip function.zip index.js
+
+# 创建函数
+aws lambda create-function \
+  --function-name my-function \
+  --runtime nodejs18.x \
+  --role arn:aws:iam::123456789012:role/lambda-role \
+  --handler index.handler \
+  --zip-file fileb://function.zip
+
+# 调用函数
+aws lambda invoke \
+  --function-name my-function \
+  --payload '{"name": "World"}' \
+  response.json
+```
+
+### 使用 Lambda 处理 HTTP 请求（API Gateway）
+
+```javascript
+// index.js
+exports.handler = async (event) => {
+  // event 包含 HTTP 请求信息
+  const { httpMethod, path, body } = event
+  
+  let response
+  
+  if (httpMethod === 'GET') {
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({ message: 'GET request received' })
+    }
+  } else if (httpMethod === 'POST') {
+    const data = JSON.parse(body)
+    response = {
+      statusCode: 200,
+      body: JSON.stringify({ message: 'POST request received', data })
+    }
+  } else {
+    response = {
+      statusCode: 405,
+      body: JSON.stringify({ error: 'Method not allowed' })
+    }
+  }
+  
+  return response
+}
+```
+
+## Vercel Functions
+
+### 什么是 Vercel Functions？
+
+Vercel Functions 是 Vercel 提供的 Serverless 函数服务，特别适合前端开发者。
+
+### 创建 API 接口
+
+```javascript
+// api/users.js
+export default function handler(req, res) {
+  const { method } = req
+  
+  switch (method) {
+    case 'GET':
+      // 获取用户列表
+      res.status(200).json([
+        { id: 1, name: '张三' },
+        { id: 2, name: '李四' }
+      ])
+      break
+      
+    case 'POST':
+      // 创建用户
+      const { name, email } = req.body
+      res.status(201).json({
+        id: Date.now(),
+        name,
+        email
+      })
+      break
+      
+    default:
+      res.setHeader('Allow', ['GET', 'POST'])
+      res.status(405).end(`Method ${method} Not Allowed`)
+  }
+}
+```
+
+### 调用 API
+
+```javascript
+// 前端调用
+fetch('/api/users')
+  .then(res => res.json())
+  .then(data => console.log(data))
+
+fetch('/api/users', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: '王五',
+    email: 'wangwu@example.com'
+  })
+})
+  .then(res => res.json())
+  .then(data => console.log(data))
+```
+
+## BFF 层（Backend for Frontend）
+
+### 什么是 BFF？
+
+BFF 是专门为前端应用设计的后端服务层。
+
+```
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│   前端      │─────→│   BFF 层   │─────→│   后端 API  │
+│   (React)  │      │ (Vercel     │      │   (微服务)   │
+│             │←─────│    Functions)│←─────│             │
+└─────────────┘      └─────────────┘      └─────────────┘
+```
+
+### 为什么需要 BFF？
+
+| 问题 | BFF 解决方案 |
+|------|----------------|
+| 前端需要聚合多个 API | BFF 层聚合数据 |
+| 后端 API 数据格式不适合前端 | BFF 层转换数据 |
+| 需要鉴权 | BFF 层统一处理 |
+| 需要缓存 | BFF 层添加缓存 |
+
+### BFF 实战
+
+```javascript
+// api/posts-with-author.js
+import fetch from 'node-fetch'
+
+export default async function handler(req, res) {
+  // 1. 获取文章列表
+  const postsResponse = await fetch('https://api.example.com/posts')
+  const posts = await postsResponse.json()
+  
+  // 2. 获取作者信息
+  const authorId = posts[0].authorId
+  const authorResponse = await fetch(`https://api.example.com/users/${authorId}`)
+  const author = await authorResponse.json()
+  
+  // 3. 聚合数据
+  const result = posts.map(post => ({
+    id: post.id,
+    title: post.title,
+    content: post.content,
+    author: {
+      name: author.name,
+      avatar: author.avatar
+    }
+  }))
+  
+  // 4. 返回给前端
+  res.status(200).json(result)
+}
+```
+
+## 定时任务（Cron Jobs）
+
+### 使用 Vercel Cron
+
+```javascript
+// api/cron/send-digest.js
+export default async function handler(req, res) {
+  // 验证请求来自 Vercel Cron
+  if (req.headers['x-vercel-cron'] !== '1') {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+  
+  // 发送每日摘要邮件
+  const users = await getUsers()
+  
+  for (const user of users) {
+    await sendEmail({
+      to: user.email,
+      subject: '每日摘要',
+      body: generateDigest(user)
+    })
+  }
+  
+  res.status(200).json({ success: true })
+}
+```
+
+```json
+// vercel.json
+{
+  "crons": [
+    {
+      "path": "/api/cron/send-digest",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
+```
+
+## 文件上传
+
+### 使用 Vercel Functions 处理文件上传
+
+```javascript
+// api/upload.js
+import { writeFile } from 'fs/promises'
+import { tmpdir } from 'os'
+import { join } from 'path'
+
+export const config = {
+  api: {
+    bodyParser: false
+  }
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' })
+  }
+  
+  const { files } = await parseMultipartForm(req)
+  
+  for (const file of files) {
+    const filePath = join(tmpdir(), file.originalname)
+    await writeFile(filePath, file.buffer)
+    
+    // 上传到云存储（如 AWS S3）
+    // await uploadToS3(filePath, file.originalname)
+  }
+  
+  res.status(200).json({ success: true })
+}
+```
+
+## 数据库连接
+
+### Serverless 数据库连接问题
+
+```
+问题：
+- 每个函数调用可能创建新的数据库连接
+- 连接数很快用完
+- 函数执行完，连接未释放
+```
+
+### 解决方案：使用连接池
+
+```javascript
+// lib/db.js
+import { createPool } from 'mysql2'
+
+let pool
+
+function getPool() {
+  if (!pool) {
+    pool = createPool({
+      host: process.env.DB_HOST,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      connectionLimit: 10
+    })
+  }
+  
+  return pool
+}
+
+export default getPool
+```
+
+```javascript
+// api/users.js
+import getPool from '../../lib/db'
+
+export default async function handler(req, res) {
+  const pool = getPool()
+  
+  const [rows] = await pool.execute('SELECT * FROM users')
+  
+  res.status(200).json(rows)
+}
+```
+
+## 实战：Serverless 博客 API
+
+### 项目结构
+
+```
+my-blog-api/
+├── api/
+│   ├── posts.js          # 获取/创建文章
+│   ├── posts/
+│   │   └── [id].js      # 获取/更新/删除单篇文章
+│   ├── comments.js       # 获取/创建评论
+│   └── cron/
+│       └── generate-sitemap.js  # 定时生成站点地图
+├── lib/
+│   ├── db.js            # 数据库连接
+│   └── auth.js          # 鉴权
+└── vercel.json          # Vercel 配置
+```
+
+### 实现文章 API
+
+```javascript
+// api/posts.js
+import getPool from '../../lib/db'
+import { withAuth } from '../../lib/auth'
+
+export default withAuth(async (req, res) => {
+  const pool = getPool()
+  
+  if (req.method === 'GET') {
+    const [rows] = await pool.execute(
+      'SELECT * FROM posts ORDER BY created_at DESC'
+    )
+    
+    res.status(200).json(rows)
+  } else if (req.method === 'POST') {
+    const { title, content } = req.body
+    const authorId = req.user.id
+    
+    const [result] = await pool.execute(
+      'INSERT INTO posts (title, content, author_id) VALUES (?, ?, ?)',
+      [title, content, authorId]
+    )
+    
+    res.status(201).json({
+      id: result.insertId,
+      title,
+      content,
+      authorId
+    })
+  } else {
+    res.setHeader('Allow', ['GET', 'POST'])
+    res.status(405).end(`Method ${req.method} Not Allowed`)
+  }
+})
+```
+
+```javascript
+// lib/auth.js
+export function withAuth(handler) {
+  return async (req, res) => {
+    // 验证 JWT
+    const token = req.headers.authorization?.split(' ')[1]
+    
+    if (!token) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
+    
+    try {
+      const user = verifyToken(token)
+      req.user = user
+      return handler(req, res)
+    } catch (error) {
+      return res.status(401).json({ error: 'Invalid token' })
+    }
+  }
+}
+```
+
+## 小结
+
+✅ **已完成：**
+- 理解了 Serverless 的概念和优缺点
+- 学会了 AWS Lambda 基础
+- 掌握了 Vercel Functions 开发
+- 了解了 BFF 层的设计
+- 学会了定时任务和文件上传
+- 掌握了 Serverless 数据库连接
+
+🚀 **下一步：**
+- 学习监控与日志
+- 完成项目实战案例
+
+💡 **提示：** Serverless 非常适合轻量级 API、定时任务、Webhook 处理等场景！

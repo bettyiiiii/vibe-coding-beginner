@@ -1,0 +1,458 @@
+---
+title: "监控与日志"
+chapter: "21"
+description: "学习应用监控、日志管理、错误追踪、性能分析，掌握运维可观测性"
+---
+
+# 监控与日志
+
+> 如果出问题了，你怎么知道？如果知道，怎么快速定位？
+
+## 为什么需要监控和日志？
+
+### 没有监控的痛点
+
+```
+场景 1：用户投诉"网站打不开了"
+你：让我登录服务器看看...
+（10 分钟后）
+你：哦，磁盘满了...
+
+场景 2：用户投诉"下单很慢"
+你：让我看看代码...
+（30 分钟后）
+你：哦，数据库查询没加索引...
+
+场景 3：用户投诉"偶尔会报错"
+你：让我看看...
+（永远找不到问题，因为无法复现）
+```
+
+### 监控和日志的作用
+
+```
+✅ 提前预警：磁盘 80% 时收到告警
+✅ 快速定位：查看日志，5 分钟找到慢查询
+✅ 问题复现：错误日志 + Stack Trace，轻松复现
+✅ 性能分析：看到每个请求的耗时，找到瓶颈
+```
+
+## 日志（Logging）
+
+### 日志级别
+
+| 级别 | 说明 | 例子 |
+|------|------|------|
+| `error` | 错误（影响功能） | 数据库连接失败 |
+| `warn` | 警告（不影响功能，但需注意） | API 响应慢 |
+| `info` | 信息（正常流程） | 用户登录成功 |
+| `debug` | 调试（开发时使用） | 查询参数 |
+
+### Node.js 日志
+
+```javascript
+// 使用 winston
+const winston = require('winston')
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
+  transports: [
+    // 写入文件
+    new winston.transports.File({ filename: 'error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'combined.log' })
+  ]
+})
+
+// 开发环境：同时输出到控制台
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.simple()
+  }))
+}
+
+// 使用
+logger.error('数据库连接失败', { error: err.message })
+logger.warn('API 响应慢', { url: req.url, duration: 2000 })
+logger.info('用户登录成功', { userId: user.id })
+logger.debug('查询参数', { query: req.query })
+```
+
+### 日志最佳实践
+
+```javascript
+// ❌ 坏例子：日志信息不足
+logger.error('Error occurred')
+
+// ✅ 好例子：包含上下文
+logger.error('Failed to create user', {
+  error: err.message,
+  stack: err.stack,
+  userId: req.user.id,
+  requestId: req.requestId,
+  duration: Date.now() - startTime
+})
+```
+
+```javascript
+// ✅ 使用 requestId 追踪请求
+const { v4: uuidv4 } = require('uuid')
+
+app.use((req, res, next) => {
+  req.requestId = uuidv4()
+  logger.info('Request started', {
+    requestId: req.requestId,
+    method: req.method,
+    url: req.url
+  })
+  next()
+})
+```
+
+## 错误追踪（Error Tracking）
+
+### 为什么需要错误追踪？
+
+```
+问题：
+1. 用户遇到错误，不会告诉你
+2. 错误发生在前端，后端日志看不到
+3. 无法复现错误（缺少上下文）
+```
+
+### 使用 Sentry
+
+```bash
+npm install @sentry/node @sentry/tracing
+```
+
+```javascript
+// server.js
+const Sentry = require('@sentry/node')
+
+Sentry.init({
+  dsn: 'https://xxx@sentry.io/xxx',
+  environment: process.env.NODE_ENV,
+  tracesSampleRate: 1.0
+})
+
+const app = express()
+
+// Sentry 中间件（必须放在最前面）
+app.use(Sentry.Handlers.requestHandler())
+app.use(Sentry.Handlers.tracingHandler())
+
+// 路由
+app.get('/', (req, res) => {
+  res.send('Hello World')
+})
+
+// Sentry 错误处理（必须放在最后面）
+app.use(Sentry.Handlers.errorHandler())
+```
+
+```javascript
+// 主动上报错误
+try {
+  JSON.parse(invalidJSON)
+} catch (err) {
+  Sentry.captureException(err)
+  logger.error('JSON parse error', { error: err.message })
+}
+```
+
+```javascript
+// 添加上下文
+Sentry.configureScope(scope => {
+  scope.setUser({
+    id: req.user.id,
+    email: req.user.email
+  })
+  scope.setTag('page_locale', 'zh-CN')
+  scope.setExtra('request_id', req.requestId)
+})
+```
+
+## 性能监控（APM）
+
+### 什么是 APM？
+
+APM（Application Performance Monitoring）应用性能监控。
+
+```
+监控指标：
+1. 响应时间（Response Time）
+2. 吞吐量（Throughput）
+3. 错误率（Error Rate）
+4. 资源使用（CPU、内存、磁盘）
+```
+
+### 使用 New Relic
+
+```javascript
+// 安装
+npm install newrelic
+
+// newrelic.js
+exports.config = {
+  app_name: ['My App'],
+  license_key: 'your-license-key',
+  logging: {
+    level: 'info'
+  }
+}
+```
+
+```javascript
+// 自定义监控
+const newrelic = require('newrelic')
+
+// 监控自定义事务
+newrelic.startBackgroundTransaction('myTask', () => {
+  // 执行任务
+})
+
+// 记录自定义指标
+newrelic.recordMetric('Custom/MyMetric', 42)
+
+// 追踪自定义错误
+newrelic.noticeError(new Error('Something went wrong'))
+```
+
+## 指标监控（Metrics）
+
+### 使用 Prometheus + Grafana
+
+```javascript
+// 安装
+npm install prom-client
+
+// metrics.js
+const client = require('prom-client')
+const collectDefaultMetrics = client.collectDefaultMetrics
+
+// 收集默认指标（CPU、内存等）
+collectDefaultMetrics({ timeout: 5000 })
+
+// 创建自定义指标
+const httpRequestDuration = new client.Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status_code']
+})
+
+// 使用中间件
+app.use((req, res, next) => {
+  const startTime = Date.now()
+  
+  res.on('finish', () => {
+    const duration = (Date.now() - startTime) / 1000
+    httpRequestDuration
+      .labels(req.method, req.route?.path || req.path, res.statusCode)
+      .observe(duration)
+  })
+  
+  next()
+})
+
+// 暴露指标端点
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', client.register.contentType)
+  res.end(client.register.metrics())
+})
+```
+
+### Grafana 仪表盘
+
+```
+示例仪表盘面板：
+1. 请求率（Requests/second）
+2. 响应时间 P50/P95/P99
+3. 错误率（Error Rate %）
+4. 活跃用户数（Active Users）
+5. 数据库查询时间（DB Query Duration）
+```
+
+## 健康检查（Health Check）
+
+### 为什么需要健康检查？
+
+```
+场景：Kubernetes 需要检查容器是否健康
+- 如果健康检查失败 → 重启容器
+- 如果健康检查成功 → 继续运行
+
+场景：负载均衡器需要检查服务器是否可用
+- 如果健康检查失败 → 停止转发流量
+- 如果健康检查成功 → 继续转发
+```
+
+### 实现健康检查端点
+
+```javascript
+app.get('/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    checks: {}
+  }
+  
+  try {
+    // 检查数据库
+    await db.query('SELECT 1')
+    health.checks.database = 'ok'
+  } catch (err) {
+    health.status = 'error'
+    health.checks.database = 'error: ' + err.message
+  }
+  
+  try {
+    // 检查 Redis
+    await redis.ping()
+    health.checks.redis = 'ok'
+  } catch (err) {
+    health.status = 'error'
+    health.checks.redis = 'error: ' + err.message
+  }
+  
+  // 返回状态码
+  const statusCode = health.status === 'ok' ? 200 : 503
+  res.status(statusCode).json(health)
+})
+```
+
+## 告警（Alerting）
+
+### 告警策略
+
+```
+告警级别：
+1. 紧急（Critical）：立即通知（短信、电话）
+   - 服务完全不可用
+   - 数据库连接失败
+   - 错误率 > 50%
+
+2. 警告（Warning）：延迟通知（邮件、Slack）
+   - 磁盘使用率 > 80%
+   - 错误率 > 10%
+   - 响应时间 P99 > 5s
+
+3. 信息（Info）：不通知，只记录
+   - 部署成功
+   - 配置更新
+```
+
+### 使用 PagerDuty
+
+```javascript
+const pagerduty = require('pagerduty')
+
+// 发送告警
+async function sendAlert(incident) {
+  await pagerduty.incidents.create({
+    incident: {
+      type: 'incident',
+      title: incident.title,
+      service: { id: 'your-service-id', type: 'service_reference' },
+      urgency: incident.urgency, // 'high' or 'low'
+      body: {
+        type: 'incident_body',
+        details: incident.details
+      }
+    }
+  })
+}
+
+// 使用
+app.use((err, req, res, next) => {
+  if (err.status === 500) {
+    sendAlert({
+      title: `Server Error: ${err.message}`,
+      urgency: 'high',
+      details: {
+        error: err.message,
+        stack: err.stack,
+        requestId: req.requestId
+      }
+    })
+  }
+  
+  res.status(500).json({ error: 'Internal Server Error' })
+})
+```
+
+## 实战：Express 应用监控
+
+```javascript
+// app.js
+const express = require('express')
+const winston = require('winston')
+const Sentry = require('@sentry/node')
+const client = require('prom-client')
+
+const app = express()
+
+// 1. Sentry（错误追踪）
+Sentry.init({ dsn: 'your-sentry-dsn' })
+app.use(Sentry.Handlers.requestHandler())
+
+// 2. 日志（Winston）
+const logger = winston.createLogger({
+  transports: [new winston.transports.File({ filename: 'app.log' })]
+})
+
+app.use((req, res, next) => {
+  req.requestId = uuidv4()
+  logger.info('Request', { requestId: req.requestId, method: req.method, url: req.url })
+  next()
+})
+
+// 3. 指标（Prometheus）
+const httpRequestDuration = new client.Histogram({
+  name: 'http_request_duration_ms',
+  help: 'Duration of HTTP requests in ms',
+  labelNames: ['method', 'route', 'status']
+})
+
+app.use((req, res, next) => {
+  const start = Date.now()
+  res.on('finish', () => {
+    const duration = Date.now() - start
+    httpRequestDuration.labels(req.method, req.route?.path, res.statusCode).observe(duration)
+  })
+  next()
+})
+
+app.get('/metrics', (req, res) => {
+  res.set('Content-Type', client.register.contentType)
+  res.end(client.register.metrics())
+})
+
+// 4. 健康检查
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' })
+})
+
+// 5. Sentry 错误处理
+app.use(Sentry.Handlers.errorHandler())
+
+app.listen(3000)
+```
+
+## 小结
+
+✅ **已完成：**
+- 理解了监控和日志的重要性
+- 学会了日志（Winston）的使用
+- 掌握了错误追踪（Sentry）
+- 了解了性能监控（APM）
+- 学会了指标监控（Prometheus + Grafana）
+- 掌握了健康检查和告警
+
+🚀 **下一步：**
+- 完成项目实战案例
+
+💡 **提示：** 监控和日志是生产环境的"眼睛"，一定要重视！

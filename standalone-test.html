@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>独立测试页</title>
+  <style>
+    body { font-family: sans-serif; padding: 40px; background: #f0f0f0; }
+    h1 { color: green; }
+    .box { background: white; padding: 20px; border-radius: 8px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>✅ 如果你看到这行字，说明浏览器渲染正常</h1>
+  <div class="box">
+    <p><strong>当前时间：</strong><span id="t"></span></p>
+    <p><strong>当前地址：</strong><span id="u"></span></p>
+    <p><strong>User Agent：</strong><span id="a"></span></p>
+  </div>
+  <script>
+    document.getElementById('t').textContent = new Date().toLocaleString()
+    document.getElementById('u').textContent = location.href
+    document.getElementById('a').textContent = navigator.userAgent
+  </script>
+</body>
+</html>
