@@ -13,7 +13,7 @@ const projects = [
   { title: '待办清单', difficulty: '⭐', tags: ['JavaScript', '交互'], desc: '实现一个可以添加、删除、标记完成的待办清单', prompt: '用 HTML + CSS + JavaScript 做一个待办清单应用，功能：添加任务、删除任务、标记完成、本地存储。' },
   { title: '天气小工具', difficulty: '⭐', tags: ['API', '异步'], desc: '调用天气 API，展示当前天气信息', prompt: '用 HTML + JS 做一个天气查询小工具，调用免费天气 API，输入城市名显示当前天气、温度、湿度。' },
   { title: '记账本', difficulty: '⭐⭐', tags: ['数据', '本地存储'], desc: '可以记录收入支出的简单记账工具', prompt: '用 HTML + CSS + JS 实现一个记账本，功能：添加收支记录、分类统计、本地存储、月度汇总。' },
-  { title: '番茄钟', difficulty: '⭐⭐', tags: ['定时器', ' productivity'], desc: '专注工作 25 分钟，休息 5 分钟的番茄工作法工具', prompt: '用 HTML + CSS + JS 做一个番茄钟计时器，25分钟工作 + 5分钟休息，有进度环、提示音、统计面板。' },
+  { title: '番茄钟', difficulty: '⭐⭐', tags: ['定时器', '效率'], desc: '专注工作 25 分钟，休息 5 分钟的番茄工作法工具', prompt: '用 HTML + CSS + JS 做一个番茄钟计时器，25分钟工作 + 5分钟休息，有进度环、提示音、统计面板。' },
 
   // 中级
   { title: '聊天室', difficulty: '⭐⭐⭐', tags: ['WebSocket', '实时'], desc: '基于 WebSocket 的简易聊天室', prompt: '用 React + Node.js + Socket.io 实现一个聊天室，支持：多用户、房间、消息历史。' },
@@ -42,14 +42,14 @@ export default function ProjectIdeas() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50">
       {/* 页面标题 */}
       <section className="pt-24 pb-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="font-pixel text-2xl md:text-3xl text-pink-500 mb-4 animate-fade-in-up">
+          <h1 className="text-2xl md:text-3xl text-primary-600 mb-4 animate-fade-in-up">
             💡 项目创意库
           </h1>
-          <p className="text-gray-600 font-elegant text-lg">
+          <p className="text-gray-600 text-lg">
             20+ 个渐进式项目创意，附提示词关键词 ✨
           </p>
         </div>
@@ -64,8 +64,8 @@ export default function ProjectIdeas() {
               onClick={() => setFilter(c)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                 filter === c
-                  ? 'bg-pink-400 text-white shadow-lg shadow-pink-200'
-                  : 'bg-white text-gray-600 hover:bg-pink-50 border border-pink-100'
+                  ? 'bg-primary-600 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-primary-50 border border-gray-200'
               }`}
             >
               {c}
@@ -80,11 +80,7 @@ export default function ProjectIdeas() {
           {filtered.map((p, i) => {
             const diff = difficultyMap[p.difficulty] || difficultyMap['⭐'];
             return (
-              <div
-                key={p.title}
-                className="card-pink p-6 relative overflow-hidden group scroll-animate opacity-0"
-                style={{ animationDelay: `${i * 0.1}s` }}
-              >
+              <div key={p.title} className="card p-6 relative overflow-hidden group hover:shadow-lg">
                 {/* 难度标签 */}
                 <div className={`absolute top-3 right-3 text-xs px-2 py-0.5 rounded-full ${diff.color}`}>
                   {diff.label}
@@ -94,12 +90,12 @@ export default function ProjectIdeas() {
                 <h3 className="font-bold text-gray-800 mb-2 pr-16">{p.title}</h3>
 
                 {/* 描述 */}
-                <p className="text-sm text-gray-600 font-elegant leading-relaxed mb-3">{p.desc}</p>
+                <p className="text-sm text-gray-600 leading-relaxed mb-3">{p.desc}</p>
 
                 {/* 标签 */}
                 <div className="flex flex-wrap gap-1 mb-4">
                   {p.tags.map(t => (
-                    <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-600 font-medium">{t}</span>
+                    <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 font-medium">{t}</span>
                   ))}
                 </div>
 
@@ -111,7 +107,7 @@ export default function ProjectIdeas() {
                 {/* 复制按钮 */}
                 <button
                   onClick={() => handleCopy(p.prompt, i)}
-                  className="btn-pink text-xs px-3 py-1.5 w-full"
+                  className="btn btn-primary text-xs w-full"
                 >
                   {copiedIdx === i ? '✅ 已复制' : '📋 复制提示词'}
                 </button>
@@ -121,9 +117,9 @@ export default function ProjectIdeas() {
         </div>
 
         {/* 提示 */}
-        <div className="mt-12 p-6 bg-pink-50 rounded-2xl border border-pink-200 scroll-animate opacity-0">
-          <h4 className="font-bold text-pink-700 mb-2">💡 使用提示</h4>
-          <ul className="text-sm text-gray-700 space-y-1 font-elegant">
+        <div className="mt-12 p-6 bg-primary-50 rounded-2xl border border-primary-200">
+          <h4 className="font-bold text-primary-700 mb-2">💡 使用提示</h4>
+          <ul className="text-sm text-gray-700 space-y-1">
             <li>• 复制提示词后，替换【】中的内容为你的实际需求</li>
             <li>• 建议从 ⭐ 入门级项目开始，循序渐进</li>
             <li>• 每个项目完成后，尝试添加自己的创意功能</li>

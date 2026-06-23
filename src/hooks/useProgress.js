@@ -1,3 +1,4 @@
+import { useState } from 'react';
 // 学习进度管理 hook
 const STORAGE_KEY = 'vibe-coding-progress';
 
@@ -20,15 +21,24 @@ export function markChapterRead(chapterId) {
   }
 }
 
+export function isChapterCompleted(chapterId) {
+  const progress = getProgress();
+  return !!progress[chapterId];
+}
+
 export function useProgress() {
-  const [progress, setProgress] = useState(getProgress());
+  const [progress, setProgress] = useState(() => getProgress());
 
   const markRead = (chapterId) => {
     markChapterRead(chapterId);
     setProgress(getProgress());
   };
 
-  return { progress, markRead, getProgress, markChapterRead };
+  const isCompleted = (chapterId) => {
+    return !!progress[chapterId];
+  };
+
+  return { progress, markRead, isCompleted };
 }
 
 export default useProgress;

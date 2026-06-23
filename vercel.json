@@ -1,23 +1,14 @@
 {
-  "name": "vibe-coding-beginner",
   "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "buildCommand": "npm run build",
-        "outputDirectory": "dist"
-      }
+  "buildCommand": "npm run build",
+  "build": {
+    "env": {
+      "NODE_VERSION": "18"
     }
-  ],
+  },
+  "outputDirectory": "dist",
   "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
-  "env": {
-    "VITE_APP_TITLE": "Vibe Coding - 用 AI 写出你的第一个作品"
-  }
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 }

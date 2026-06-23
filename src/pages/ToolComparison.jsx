@@ -74,14 +74,14 @@ export default function ToolComparison() {
     .sort((a, b) => (sortBy === 'rating' ? b.rating - a.rating : 0));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50">
       {/* 页面标题 */}
       <section className="pt-24 pb-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="font-pixel text-2xl md:text-3xl text-pink-500 mb-4 animate-fade-in-up">
+          <h1 className="text-2xl md:text-3xl text-primary-600 mb-4 animate-fade-in-up">
             🔍 AI 工具对比
           </h1>
-          <p className="text-gray-600 font-elegant text-lg">
+          <p className="text-gray-600 text-lg">
             多维度对比主流 AI 编程工具，帮你选对武器 ✨
           </p>
         </div>
@@ -96,8 +96,8 @@ export default function ToolComparison() {
               onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                 filter === f
-                  ? 'bg-pink-400 text-white shadow-lg shadow-pink-200'
-                  : 'bg-white text-gray-600 hover:bg-pink-50 border border-pink-100'
+                  ? 'bg-primary-600 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-primary-50 border border-gray-200'
               }`}
             >
               {f}
@@ -108,7 +108,7 @@ export default function ToolComparison() {
           <button
             onClick={() => setSortBy('rating')}
             className={`text-sm px-3 py-1 rounded ${
-              sortBy === 'rating' ? 'bg-pink-100 text-pink-600' : 'text-gray-500 hover:text-pink-500'
+              sortBy === 'rating' ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:text-primary-600'
             }`}
           >
             ⭐ 按评分排序
@@ -119,19 +119,15 @@ export default function ToolComparison() {
       {/* 工具卡片网格 */}
       <section className="max-w-6xl mx-auto px-4 pb-20">
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((t, i) => (
-            <div
-              key={t.name}
-              className="card-pink p-6 scroll-animate opacity-0"
-              style={{ animationDelay: `${i * 0.1}s` }}
-            >
+          {filtered.map((t) => (
+            <div key={t.name} className="card p-6 hover:shadow-lg">
               {/* 头部：图标 + 名称 + 评分 */}
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <span className="text-3xl">{t.icon}</span>
                   <div>
                     <h3 className="font-bold text-gray-800">{t.name}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-600 font-medium">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 font-medium">
                       {t.type}
                     </span>
                   </div>
@@ -141,13 +137,13 @@ export default function ToolComparison() {
 
               {/* 价格 */}
               <div className="grid grid-cols-2 gap-2 mb-4 text-sm">
-                <div className="bg-pink-50 p-2 rounded-lg">
+                <div className="bg-primary-50 p-2 rounded-lg">
                   <div className="text-xs text-gray-500">免费方案</div>
-                  <div className="font-medium text-pink-600">{t.free}</div>
+                  <div className="font-medium text-primary-600">{t.free}</div>
                 </div>
-                <div className="bg-pink-50 p-2 rounded-lg">
+                <div className="bg-primary-50 p-2 rounded-lg">
                   <div className="text-xs text-gray-500">付费方案</div>
-                  <div className="font-medium text-pink-600">{t.paid}</div>
+                  <div className="font-medium text-primary-600">{t.paid}</div>
                 </div>
               </div>
 
@@ -157,7 +153,7 @@ export default function ToolComparison() {
                 <ul className="text-sm text-gray-700 space-y-1">
                   {t.highlights.map(h => (
                     <li key={h} className="flex items-start gap-1">
-                      <span className="text-pink-400 mt-0.5">•</span>
+                      <span className="text-primary-400 mt-0.5">•</span>
                       <span>{h}</span>
                     </li>
                   ))}
@@ -165,18 +161,18 @@ export default function ToolComparison() {
               </div>
 
               {/* 适合场景 */}
-              <div className="pt-3 border-t border-pink-100">
+              <div className="pt-3 border-t border-gray-100">
                 <div className="text-xs text-gray-400">🎯 最适合</div>
-                <div className="text-sm text-pink-600 font-medium">{t.bestFor}</div>
+                <div className="text-sm text-primary-600 font-medium">{t.bestFor}</div>
               </div>
             </div>
           ))}
         </div>
 
         {/* 提示 */}
-        <div className="mt-12 p-6 bg-pink-50 rounded-2xl border border-pink-200 scroll-animate opacity-0">
-          <h4 className="font-bold text-pink-700 mb-2">💡 选择建议</h4>
-          <ul className="text-sm text-gray-700 space-y-1 font-elegant">
+        <div className="mt-12 p-6 bg-primary-50 rounded-2xl border border-primary-200">
+          <h4 className="font-bold text-primary-700 mb-2">💡 选择建议</h4>
+          <ul className="text-sm text-gray-700 space-y-1">
             <li>• <strong>零基础入门</strong>：先用 ChatGPT 熟悉 AI 对话模式</li>
             <li>• <strong>认真学习编程</strong>：推荐 Cursor 或 Windsurf，集成度更高</li>
             <li>• <strong>预算有限</strong>：Windsurf 性价比最高，免费版也够用</li>

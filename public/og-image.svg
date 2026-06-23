@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#a78bfa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c4b5fd;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 背景 -->
+  <rect width="1200" height="630" fill="url(#bg)" />
+  
+  <!-- 装饰圆 -->
+  <circle cx="1050" cy="100" r="120" fill="rgba(255,255,255,0.08)" />
+  <circle cx="150" cy="530" r="80" fill="rgba(255,255,255,0.05)" />
+  <rect x="900" y="480" width="200" height="200" rx="40" fill="rgba(255,255,255,0.04)" transform="rotate(20 1000 580)" />
+  
+  <!-- 主标题 -->
+  <text x="600" y="240" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="white" text-anchor="middle">Vibe Coding</text>
+  
+  <!-- 副标题 -->
+  <text x="600" y="310" font-family="Arial, sans-serif" font-size="32" fill="rgba(255,255,255,0.9)" text-anchor="middle">用 AI 写出你的第一个作品</text>
+  
+  <!-- 分割线 -->
+  <line x1="400" y1="345" x2="800" y2="345" stroke="rgba(255,255,255,0.3)" stroke-width="2" />
+  
+  <!-- 特性标签 -->
+  <rect x="260" y="380" width="160" height="52" rx="26" fill="rgba(255,255,255,0.15)" />
+  <text x="340" y="413" font-family="Arial, sans-serif" font-size="22" fill="white" text-anchor="middle">AI 工具</text>
+  
+  <rect x="440" y="380" width="160" height="52" rx="26" fill="rgba(255,255,255,0.15)" />
+  <text x="520" y="413" font-family="Arial, sans-serif" font-size="22" fill="white" text-anchor="middle">编程入门</text>
+  
+  <rect x="620" y="380" width="160" height="52" rx="26" fill="rgba(255,255,255,0.15)" />
+  <text x="700" y="413" font-family="Arial, sans-serif" font-size="22" fill="white" text-anchor="middle">实战项目</text>
+  
+  <rect x="800" y="380" width="160" height="52" rx="26" fill="rgba(255,255,255,0.15)" />
+  <text x="880" y="413" font-family="Arial, sans-serif" font-size="22" fill="white" text-anchor="middle">进阶之路</text>
+  
+  <!-- 底部网址 -->
+  <text x="600" y="520" font-family="Arial, sans-serif" font-size="24" fill="rgba(255,255,255,0.6)" text-anchor="middle">vibe-coding.vercel.app</text>
+</svg>

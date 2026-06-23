@@ -101,14 +101,14 @@ export default function LearningPath() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50">
       {/* 页面标题 */}
       <section className="pt-24 pb-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="font-pixel text-2xl md:text-3xl text-pink-500 mb-4 animate-fade-in-up">
+          <h1 className="text-2xl md:text-3xl text-primary-600 mb-4 animate-fade-in-up">
             🗺️ 学习路径规划器
           </h1>
-          <p className="text-gray-600 font-elegant text-lg">
+          <p className="text-gray-600 text-lg">
             回答 3 个问题，生成你的专属学习路径 ✨
           </p>
         </div>
@@ -117,14 +117,14 @@ export default function LearningPath() {
       <div className="max-w-2xl mx-auto px-4 pb-20">
         {!result ? (
           /* 问答区 */
-          <div className="card-pink p-8 md:p-12 scroll-animate opacity-0">
+          <div className="card p-8 md:p-12">
             {/* 进度指示器 */}
             <div className="flex items-center gap-2 mb-8">
               {questions.map((_, i) => (
                 <div
                   key={i}
                   className={`h-2 flex-1 rounded-full transition-all duration-300 ${
-                    i < step ? 'bg-pink-400' : i === step ? 'bg-pink-300 animate-pulse-soft' : 'bg-pink-100'
+                    i < step ? 'bg-primary-600' : i === step ? 'bg-primary-300' : 'bg-gray-200'
                   }`}
                 />
               ))}
@@ -141,7 +141,7 @@ export default function LearningPath() {
                 <button
                   key={opt.value}
                   onClick={() => handleAnswer(opt.value)}
-                  className="w-full text-left px-6 py-4 rounded-xl border-2 border-pink-100 hover:border-pink-400 hover:bg-pink-50 transition-all duration-200 font-medium text-gray-700 hover:text-pink-600"
+                  className="w-full text-left px-6 py-4 rounded-xl border-2 border-gray-200 hover:border-primary-400 hover:bg-primary-50 transition-all duration-200 font-medium text-gray-700 hover:text-primary-600"
                 >
                   {opt.label}
                 </button>
@@ -155,12 +155,12 @@ export default function LearningPath() {
           </div>
         ) : (
           /* 结果展示 */
-          <div className="scroll-animate opacity-0">
-            <div className="card-pink p-8 md:p-12 mb-6">
+          <div>
+            <div className="card p-8 md:p-12 mb-6 hover:shadow-lg">
               <div className="text-center mb-8">
-                <div className="text-4xl mb-4 animate-bounce-soft">🎉</div>
+                <div className="text-4xl mb-4">🎉</div>
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">{result.title}</h2>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-pink-100 text-pink-600 font-medium text-sm">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-100 text-primary-600 font-medium text-sm">
                   ⏱️ 预计学习时间：{result.weeks} 周
                 </div>
               </div>
@@ -170,21 +170,21 @@ export default function LearningPath() {
                 <h3 className="font-bold text-gray-700 mb-4">📅 学习里程碑</h3>
                 <div className="space-y-3">
                   {result.milestones.map((m, i) => (
-                    <div key={i} className="flex items-start gap-3 p-4 bg-pink-50/50 rounded-xl">
-                      <span className="w-6 h-6 rounded-full bg-pink-400 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                    <div key={i} className="flex items-start gap-3 p-4 bg-primary-50/50 rounded-xl">
+                      <span className="w-6 h-6 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                         {i + 1}
                       </span>
-                      <span className="text-sm text-gray-700 font-elegant">{m}</span>
+                      <span className="text-sm text-gray-700">{m}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* 提示 */}
-              <div className="p-4 bg-gradient-to-r from-pink-50 to-peach-50 rounded-xl border border-pink-200">
+              <div className="p-4 bg-gradient-to-r from-primary-50 to-amber-50 rounded-xl border border-primary-200">
                 <div className="flex items-start gap-2">
-                  <span className="text-pink-500 mt-0.5">💡</span>
-                  <p className="text-sm text-gray-700 font-elegant">{result.tip}</p>
+                  <span className="text-primary-500 mt-0.5">💡</span>
+                  <p className="text-sm text-gray-700">{result.tip}</p>
                 </div>
               </div>
             </div>
@@ -193,13 +193,13 @@ export default function LearningPath() {
             <div className="flex flex-wrap justify-center gap-4">
               <button
                 onClick={handleReset}
-                className="btn-pink text-base px-8 py-3"
+                className="btn btn-primary text-base px-8 py-3"
               >
                 🔄 重新测试
               </button>
               <a
                 href="/chapters"
-                className="btn-pixel text-base px-8 py-3 no-underline inline-block"
+                className="btn btn-accent text-base px-8 py-3 no-underline inline-block"
               >
                 📚 开始学习
               </a>

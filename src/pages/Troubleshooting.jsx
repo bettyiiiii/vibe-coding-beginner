@@ -80,14 +80,14 @@ export default function Troubleshooting() {
   const filtered = activeCategory === '全部' ? issues : issues.filter(i => i.category === activeCategory);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50">
       {/* 页面标题 */}
       <section className="pt-24 pb-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="font-pixel text-2xl md:text-3xl text-pink-500 mb-4 animate-fade-in-up">
+          <h1 className="text-2xl md:text-3xl text-primary-600 mb-4 animate-fade-in-up">
             🔧 常见错误排查
           </h1>
-          <p className="text-gray-600 font-elegant text-lg">
+          <p className="text-gray-600 text-lg">
             交互式故障排查指南，点开查看解决方案 ✨
           </p>
         </div>
@@ -102,8 +102,8 @@ export default function Troubleshooting() {
               onClick={() => setActiveCategory(c)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                 activeCategory === c
-                  ? 'bg-pink-400 text-white shadow-lg shadow-pink-200'
-                  : 'bg-white text-gray-600 hover:bg-pink-50 border border-pink-100'
+                  ? 'bg-primary-600 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-primary-50 border border-gray-200'
               }`}
             >
               {c}
@@ -115,26 +115,22 @@ export default function Troubleshooting() {
       {/* 问题列表 */}
       <section className="max-w-4xl mx-auto px-4 pb-20">
         <div className="space-y-4">
-          {filtered.map((issue, i) => {
+          {filtered.map((issue) => {
             const isExpanded = expandedId === issue.id;
             return (
-              <div
-                key={issue.id}
-                className="card-pink p-0 overflow-hidden scroll-animate opacity-0"
-                style={{ animationDelay: `${i * 0.1}s` }}
-              >
+              <div key={issue.id} className="card overflow-hidden hover:shadow-md">
                 {/* 问题标题（可点击展开） */}
                 <button
                   onClick={() => setExpandedId(isExpanded ? null : issue.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-pink-50/50 transition-colors"
+                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-primary-50/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-8 h-8 rounded-full bg-pink-100 flex items-center justify-center text-pink-500 font-bold text-sm">
+                    <span className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold text-sm">
                       {issue.id}
                     </span>
                     <span className="font-bold text-gray-800">{issue.title}</span>
                   </div>
-                  <span className={`text-pink-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                  <span className={`text-primary-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
                     ▼
                   </span>
                 </button>
@@ -143,18 +139,18 @@ export default function Troubleshooting() {
                 {isExpanded && (
                   <div className="px-6 pb-6 animate-fade-in-up">
                     {/* 症状 */}
-                    <div className="mb-4 p-4 bg-pink-50 rounded-xl">
-                      <h4 className="font-bold text-pink-700 mb-1 text-sm">🚨 症状</h4>
-                      <p className="text-sm text-gray-700 font-elegant">{issue.symptom}</p>
+                    <div className="mb-4 p-4 bg-red-50 rounded-xl">
+                      <h4 className="font-bold text-red-700 mb-1 text-sm">🚨 症状</h4>
+                      <p className="text-sm text-gray-700">{issue.symptom}</p>
                     </div>
 
                     {/* 可能原因 */}
                     <div className="mb-4">
                       <h4 className="font-bold text-gray-700 mb-2 text-sm">🔍 可能原因</h4>
-                      <ul className="text-sm text-gray-600 space-y-1 font-elegant">
+                      <ul className="text-sm text-gray-600 space-y-1">
                         {issue.causes.map((c, ci) => (
                           <li key={ci} className="flex items-start gap-1">
-                            <span className="text-pink-400 mt-0.5">•</span>
+                            <span className="text-primary-400 mt-0.5">•</span>
                             <span>{c}</span>
                           </li>
                         ))}
@@ -164,10 +160,10 @@ export default function Troubleshooting() {
                     {/* 解决步骤 */}
                     <div className="mb-4">
                       <h4 className="font-bold text-gray-700 mb-2 text-sm">🛠️ 解决步骤</h4>
-                      <ol className="text-sm text-gray-600 space-y-2 font-elegant">
+                      <ol className="text-sm text-gray-600 space-y-2">
                         {issue.steps.map((s, si) => (
                           <li key={si} className="flex items-start gap-2">
-                            <span className="w-5 h-5 rounded-full bg-pink-400 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                            <span className="w-5 h-5 rounded-full bg-primary-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                               {si + 1}
                             </span>
                             <span>{s}</span>
@@ -179,7 +175,7 @@ export default function Troubleshooting() {
                     {/* 预防建议 */}
                     <div className="p-4 bg-green-50 rounded-xl border border-green-200">
                       <h4 className="font-bold text-green-700 mb-1 text-sm">✅ 预防建议</h4>
-                      <p className="text-sm text-green-800 font-elegant">{issue.prevention}</p>
+                      <p className="text-sm text-green-800">{issue.prevention}</p>
                     </div>
                   </div>
                 )}
@@ -189,9 +185,9 @@ export default function Troubleshooting() {
         </div>
 
         {/* 提示 */}
-        <div className="mt-12 p-6 bg-pink-50 rounded-2xl border border-pink-200 scroll-animate opacity-0">
-          <h4 className="font-bold text-pink-700 mb-2">💡 通用排查技巧</h4>
-          <ul className="text-sm text-gray-700 space-y-1 font-elegant">
+        <div className="mt-12 p-6 bg-primary-50 rounded-2xl border border-primary-200">
+          <h4 className="font-bold text-primary-700 mb-2">💡 通用排查技巧</h4>
+          <ul className="text-sm text-gray-700 space-y-1">
             <li>• <strong>先看错误信息</strong>：错误信息是最好的线索，不要忽略它</li>
             <li>• <strong>分段排查</strong>：把大问题拆成小问题，逐个验证</li>
             <li>• <strong>让 AI 解释错误</strong>：把错误信息发给 AI，让它用通俗语言解释</li>

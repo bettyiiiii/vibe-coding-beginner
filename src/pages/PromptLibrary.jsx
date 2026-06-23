@@ -63,14 +63,14 @@ export default function PromptLibrary() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 via-white to-primary-50">
       {/* 页面标题 */}
       <section className="pt-24 pb-12 px-4">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="font-pixel text-2xl md:text-3xl text-pink-500 mb-4 animate-fade-in-up">
+          <h1 className="text-2xl md:text-3xl text-primary-600 mb-4 animate-fade-in-up">
             📋 提示词模板库
           </h1>
-          <p className="text-gray-600 font-elegant text-lg">
+          <p className="text-gray-600 text-lg">
             分类整理的提示词模板，可直接复制使用 ✨
           </p>
         </div>
@@ -85,8 +85,8 @@ export default function PromptLibrary() {
               onClick={() => setActiveCategory(i)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
                 activeCategory === i
-                  ? 'bg-pink-400 text-white shadow-lg shadow-pink-200'
-                  : 'bg-white text-gray-600 hover:bg-pink-50 border border-pink-100'
+                  ? 'bg-primary-600 text-white shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-primary-50 border border-gray-200'
               }`}
             >
               {cat.category}
@@ -101,13 +101,13 @@ export default function PromptLibrary() {
           {promptCategories[activeCategory].prompts.map((p, i) => {
             const globalIdx = activeCategory * 10 + i;
             return (
-              <div key={i} className="card-pink p-6 scroll-animate opacity-0" style={{ animationDelay: `${i * 0.1}s` }}>
+              <div key={i} className="card p-6">
                 {/* 标题 + 标签 */}
                 <div className="flex items-start justify-between mb-4">
                   <h3 className="font-bold text-gray-800 text-lg">{p.title}</h3>
                   <div className="flex gap-1 flex-wrap">
                     {p.tags.map(tag => (
-                      <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-pink-100 text-pink-600 font-medium">
+                      <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 font-medium">
                         {tag}
                       </span>
                     ))}
@@ -122,7 +122,7 @@ export default function PromptLibrary() {
                 {/* 复制按钮 */}
                 <button
                   onClick={() => handleCopy(p.template, globalIdx)}
-                  className="btn-pink text-sm px-4 py-2 no-underline inline-flex items-center gap-2"
+                  className="btn btn-primary text-sm"
                 >
                   {copiedId === globalIdx ? '✅ 已复制' : '📋 复制模板'}
                 </button>
@@ -132,9 +132,9 @@ export default function PromptLibrary() {
         </div>
 
         {/* 提示 */}
-        <div className="mt-12 p-6 bg-pink-50 rounded-2xl border border-pink-200 scroll-animate opacity-0">
-          <h4 className="font-bold text-pink-600 mb-2">💡 使用提示</h4>
-          <ul className="text-sm text-gray-700 space-y-1 font-elegant">
+        <div className="mt-12 p-6 bg-primary-50 rounded-2xl border border-primary-200">
+          <h4 className="font-bold text-primary-700 mb-2">💡 使用提示</h4>
+          <ul className="text-sm text-gray-700 space-y-1">
             <li>• 复制模板后，替换【】中的内容为你的实际需求</li>
             <li>• 可以组合多个模板来达到更好的效果</li>
             <li>• 如果 AI 输出不满意，可以在提示词中补充更多细节</li>

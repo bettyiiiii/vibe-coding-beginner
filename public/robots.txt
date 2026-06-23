@@ -1,0 +1,9 @@
+# robots.txt for Vibe Coding
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://vibe-coding.vercel.app/sitemap.xml
+
+# Disallow admin or private paths (none currently)
+# Disallow: /admin/
