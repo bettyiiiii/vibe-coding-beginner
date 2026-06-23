@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import mdx from '@mdx-js/rollup'
 import remarkGfm from 'remark-gfm'
 import remarkFrontmatter from 'remark-frontmatter'
+import visualizer from 'rollup-plugin-visualizer'
 
 export default defineConfig({
   plugins: [
@@ -15,4 +16,16 @@ export default defineConfig({
       providerImportSource: '@mdx-js/react',
     }),
   ],
+  build: {
+    rollupOptions: {
+      plugins: [
+        visualizer({
+          open: false,
+          filename: 'stats.html',
+          gzipSize: true,
+          brotliSize: true,
+        })
+      ]
+    }
+  }
 })
