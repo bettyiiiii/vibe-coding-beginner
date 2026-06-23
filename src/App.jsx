@@ -1,21 +1,22 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Navbar from './components/Navbar.jsx'
-import Footer from './components/Footer.jsx'
-import './styles/index.css'
-
-// 使用 React.lazy 进行代码分割，每个页面独立 chunk
-const Home = lazy(() => import('./pages/Home.jsx'))
-const ChapterList = lazy(() => import('./pages/ChapterList.jsx'))
-const ChapterDetail = lazy(() => import('./pages/ChapterDetail.jsx'))
-const NotFound = lazy(() => import('./pages/NotFound.jsx'))
+// 首屏关键路径：静态导入（保持主 bundle，避免额外请求）
+import Home from './pages/Home.jsx'
+import ChapterList from './pages/ChapterList.jsx'
+import ChapterDetail from './pages/ChapterDetail.jsx'
+import NotFound from './pages/NotFound.jsx'
+// 非首屏工具页面：动态导入（代码分割）
+import { lazy } from 'react'
 const PromptLibrary = lazy(() => import('./pages/PromptLibrary.jsx'))
 const ToolComparison = lazy(() => import('./pages/ToolComparison.jsx'))
 const ProjectIdeas = lazy(() => import('./pages/ProjectIdeas.jsx'))
 const Troubleshooting = lazy(() => import('./pages/Troubleshooting.jsx'))
 const LearningPath = lazy(() => import('./pages/LearningPath.jsx'))
 
-// 加载骨架屏
+import Navbar from './components/Navbar.jsx'
+import Footer from './components/Footer.jsx'
+import './styles/index.css'
+
 function LoadingFallback() {
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
